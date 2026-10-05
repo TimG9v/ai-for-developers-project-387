@@ -1,7 +1,7 @@
 # Календарь звонков
 
 
-[![hexlet-check](https://github.com/TimG9v/ai-for-developers-project-386/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/TimG9v/ai-for-developers-project-386/actions)
+[![hexlet-check](https://github.com/TimG9v/ai-for-developers-project-387/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/TimG9v/ai-for-developers-project-387/actions)
 
 Сервис записи на звонки по мотивам Cal.com: владелец календаря публикует
 свободные слоты, гость выбирает слот и записывается на 30-минутный звонок —
@@ -12,8 +12,9 @@
 
 ## Публичный деплой
 
-**https://calendar-zvonok.onrender.com** — Render, бесплатный план. Две
-особенности бесплатного инстанса:
+Деплой на Render выполняется в шаге 5 текущего цикла (см.
+`docs/context/`); ссылка появится здесь после верификации публичного
+URL. Особенности бесплатного инстанса, которые останутся актуальными:
 
 - после ~15 минут простоя первый запрос отвечает с задержкой на холодный
   старт (десятки секунд);
@@ -39,8 +40,8 @@
 ## Установка
 
 ```bash
-git clone https://github.com/TimG9v/ai-for-developers-project-386.git
-cd ai-for-developers-project-386
+git clone https://github.com/TimG9v/ai-for-developers-project-387.git
+cd ai-for-developers-project-387
 ```
 
 Локальный запуск без Docker (нужны Rust и Node из `.tool-versions`/`.nvmrc`):
@@ -129,7 +130,7 @@ Frontend CI (eslint, vitest, build), Security (cargo/npm audit), hexlet-check
 - Авторизации нет: админ-мутации (`POST /api/event-types`, `/api/slots`)
   публично доступны — осознанный компромисс учебного демо, решение
   отслеживается в
-  [issue #23](https://github.com/TimG9v/ai-for-developers-project-386/issues/23).
+  [issue #1](https://github.com/TimG9v/ai-for-developers-project-387/issues/1).
 - Free-инстанс Render засыпает при простое (см. «Публичный деплой»).
 
 ---
