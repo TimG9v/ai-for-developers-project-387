@@ -1,0 +1,330 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Calendar — API записи на звонок",
+    "version": "0.0.0"
+  },
+  "tags": [],
+  "paths": {
+    "/bookings": {
+      "get": {
+        "operationId": "Bookings_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Booking"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "Bookings_create",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Невалидный ввод: обязательные поля пусты или значения вне допустимых границ."
+          },
+          "404": {
+            "description": "Слот или тип встречи не найдены."
+          },
+          "409": {
+            "description": "Слот уже занят: на слот не может быть более одной записи."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Booking"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/event-types": {
+      "get": {
+        "operationId": "EventTypes_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventType"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "EventTypes_create",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventType"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Невалидный ввод: обязательные поля пусты или значения вне допустимых границ."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventType"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/slots": {
+      "get": {
+        "operationId": "Slots_list",
+        "parameters": [
+          {
+            "name": "eventTypeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "explode": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Slot"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "Slots_create",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Slot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Невалидный ввод: обязательные поля пусты или значения вне допустимых границ."
+          },
+          "404": {
+            "description": "Слот или тип встречи не найдены."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Slot"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upcoming-meetings": {
+      "get": {
+        "operationId": "UpcomingMeetings_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UpcomingMeeting"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Booking": {
+        "type": "object",
+        "required": [
+          "id",
+          "slotId",
+          "guestName",
+          "guestEmail",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slotId": {
+            "type": "string"
+          },
+          "guestName": {
+            "type": "string",
+            "description": "Имя гостя — обязательно"
+          },
+          "guestEmail": {
+            "type": "string",
+            "description": "Email гостя — обязательно"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Запись: слот, закреплённый за гостем."
+      },
+      "EventType": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "durationMinutes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание типа встречи"
+          },
+          "durationMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Длительность в минутах; определяет длительность слотов этого типа"
+          }
+        },
+        "description": "Тип встречи: разновидность встречи, которую задаёт владелец (название, описание, длительность)."
+      },
+      "Slot": {
+        "type": "object",
+        "required": [
+          "id",
+          "eventTypeId",
+          "startDateTime",
+          "endDateTime"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "eventTypeId": {
+            "type": "string",
+            "description": "Тип встречи, к которому относится слот"
+          },
+          "startDateTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endDateTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Слот: свободный интервал, опубликованный владельцем; длительность определяется типом встречи."
+      },
+      "UpcomingMeeting": {
+        "type": "object",
+        "required": [
+          "id",
+          "slotId",
+          "guestName",
+          "guestEmail",
+          "startDateTime",
+          "endDateTime",
+          "eventTypeId",
+          "eventTitle"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slotId": {
+            "type": "string"
+          },
+          "guestName": {
+            "type": "string"
+          },
+          "guestEmail": {
+            "type": "string"
+          },
+          "startDateTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endDateTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "eventTypeId": {
+            "type": "string"
+          },
+          "eventTitle": {
+            "type": "string"
+          }
+        },
+        "description": "Предстоящая встреча: ракурс владельца — запись со временем слота и типом встречи."
+      }
+    }
+  }
+}

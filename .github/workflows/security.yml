@@ -1,0 +1,59 @@
+name: Security
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - "backend/Cargo.toml"
+      - "backend/Cargo.lock"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+      - ".github/workflows/security.yml"
+  pull_request:
+    paths:
+      - "backend/Cargo.toml"
+      - "backend/Cargo.lock"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+  schedule:
+    # Ежедневная проверка новых CVE в зависимостях.
+    - cron: "0 6 * * *"
+
+jobs:
+  cargo-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust
+        # явная установка закреплённой версии: job не зависит
+        # от тулчейна, предустановленного в раннере
+        uses: dtolnay/rust-toolchain@1.98.1
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Audit Rust dependencies
+        run: cargo audit
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Audit npm dependencies (high+)
+        # --audit-level=high: падает только на high/critical. moderate/low
+        # логируются, но не красят PR — иначе любой транзитивный CVE
+        # ломает CI.
+        run: npm audit --audit-level=high --omit=dev

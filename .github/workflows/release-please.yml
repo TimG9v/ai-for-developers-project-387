@@ -1,0 +1,27 @@
+name: Release Please
+
+on:
+  # релизы только с основной ветки: release-PR открывается после
+  # мержа Conventional Commits в main (критерий приёмки шага 1/5)
+  push:
+    branches: [main]
+
+permissions:
+  # contents: write — тег и GitHub release при мерже release-PR;
+  # pull-requests: write — открытие и обновление самого release-PR;
+  # issues: write — лейблы autorelease на release-PR (Issues API),
+  #   предписано актуальным README googleapis/release-please-action
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      # googleapis/ — актуальный дом экшена: google-github-actions/
+      # депрекирован (README: «please change to googleapis/...»).
+      # without `with:` экшен читает конфиг по умолчанию:
+      # release-please-config.json (release-type: simple) и
+      # .release-please-manifest.json (корневой релиз)
+      - uses: googleapis/release-please-action@v4

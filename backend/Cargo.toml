@@ -1,0 +1,20 @@
+[package]
+name = "backend"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+
+[build-dependencies]
+prettyplease = "0.2"
+schemars = "0.8"
+serde_json = "1"
+syn = "2"
+typify = "0.8"
+
+[dev-dependencies]
+serde_json = "1"

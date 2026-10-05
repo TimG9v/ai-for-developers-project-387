@@ -1,29 +1,136 @@
-# Календарь звонков (продолжение)
+# Календарь звонков
 
 
-[![hexlet-check](https://github.com/TimG9v/ai-for-developers-project-387/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/TimG9v/ai-for-developers-project-387/actions)
+[![hexlet-check](https://github.com/TimG9v/ai-for-developers-project-386/actions/workflows/hexlet-check.yml/badge.svg)](https://github.com/TimG9v/ai-for-developers-project-386/actions)
 
-Интегрируйте работу агентов в GitHub проект
+Сервис записи на звонки по мотивам Cal.com: владелец календаря публикует
+свободные слоты, гость выбирает слот и записывается на 30-минутный звонок —
+без регистрации.
 
 Учебный проект Хекслета: https://ru.hexlet.io/programs/ai-for-developers
 Как это должно работать: https://files.hexlet.app/a/2ipc5m
 
+## Публичный деплой
+
+**https://calendar-zvonok.onrender.com** — Render, бесплатный план. Две
+особенности бесплатного инстанса:
+
+- после ~15 минут простоя первый запрос отвечает с задержкой на холодный
+  старт (десятки секунд);
+- данные хранятся в памяти процесса — ре-деплой или рестарт контейнера
+  обнуляет типы встреч, слоты и записи.
+
+Страница записи — выбор типа встречи и подтверждение записи:
+
+![Страница записи: типы встреч и подтверждение записи](docs/context/task-6/Screenshot%20From%202026-10-01%2014-37-10.png)
+
+Страница владельца — создание типов, публикация слотов, предстоящие встречи:
+
+![Страница владельца: формы создания типа и публикации слота, предстоящие встречи](docs/context/task-6/Screenshot%20From%202026-10-01%2014-37-41.png)
+
 ## Стек
 
-- Разное
+- **Backend**: Rust, axum, in-memory-хранилище (без БД)
+- **Frontend**: Next.js 16 (App Router, TypeScript, Tailwind, shadcn/ui)
+- **Контракт**: TypeSpec → OpenAPI → генерация клиентского SDK (hey-api) и
+  серверных типов (typify)
+- **Деплой**: один Docker-контейнер, Render
 
 ## Установка
 
-<!-- Опишите установку: клонирование, зависимости, переменные окружения -->
-
 ```bash
-git clone https://github.com/TimG9v/ai-for-developers-project-387.git
-cd ai-for-developers-project-387
+git clone https://github.com/TimG9v/ai-for-developers-project-386.git
+cd ai-for-developers-project-386
 ```
 
-## Использование
+Локальный запуск без Docker (нужны Rust и Node из `.tool-versions`/`.nvmrc`):
 
-<!-- Добавьте примеры запуска и запись asciinema — именно это смотрит работодатель -->
+```bash
+make dev     # backend на :8081, frontend на :3000
+make stop    # остановить оба
+```
+
+## Docker
+
+Образ поднимает оба процесса сам: backend на внутреннем `127.0.0.1:8081`
+(переменная `BACKEND_PORT`), frontend — на порту из переменной `PORT`
+(именно её передаёт платформа и автопроверка):
+
+```bash
+docker build -t calendar .
+docker run -e PORT=8080 -p 8080:8080 calendar
+```
+
+После запуска: `http://127.0.0.1:8080` — главная, `/booking` — страница
+записи, `/admin` — страница владельца, `/health` — статус.
+
+## Как устроено
+
+Страницы:
+
+| Путь       | Что это                                                                    |
+| ---------- | -------------------------------------------------------------------------- |
+| `/`        | главная — про сервис и переход на страницу записи                          |
+| `/booking` | страница записи: гость выбирает тип встречи, слот и записывается           |
+| `/admin`   | страница владельца: создание типов, публикация слотов, предстоящие встречи |
+
+API (браузер ходит через `/api/*` — same-origin, серверные компоненты —
+напрямую на `BACKEND_URL`):
+
+| Метод и путь             | Назначение                          | Коды               |
+| ------------------------ | ----------------------------------- | ------------------ |
+| `GET /health`            | статус                              | 200                |
+| `GET /event-types`       | список типов встреч                 | 200                |
+| `POST /event-types`      | создать тип встречи                 | 200, 400           |
+| `GET /slots`             | свободные слоты типа (окно 14 дней) | 200                |
+| `POST /slots`            | опубликовать слот                   | 200, 400, 404      |
+| `GET /bookings`          | список записей                      | 200                |
+| `POST /bookings`         | записать гостя на слот              | 200, 400, 404, 409 |
+| `GET /upcoming-meetings` | предстоящие встречи владельца       | 200                |
+
+Правила бронирования проверяет сервер, а не интерфейс:
+
+- слоты принимаются только в окне 14 дней вперёд (400);
+- длительность слота равна длительности его типа встречи (400 при расхождении);
+- одна запись на слот — 409, повторная запись не проходит даже для другого
+  типа встречи; занятый слот исчезает из календаря;
+- запись на неизвестный слот — 404, без имени/email — 400.
+
+## Разработка
+
+```bash
+make test            # cargo test + vitest
+make lint            # cargo fmt/clippy + eslint
+make generate        # contracts/ → openapi/ → SDK и серверные типы
+```
+
+Контракт-first: изменения API вносятся только в `contracts/main.tsp`, затем
+`make generate` перегенерирует `frontend/src/client/` и серверные типы
+backend'а — сгенерированное руками не правится.
+
+Структура репозитория:
+
+```text
+backend/     crate backend: axum-роутер, in-memory-репозитории, генерируемые типы
+frontend/    Next.js 16: app/ (страницы), components/ (shadcn/ui), tests/ (vitest)
+contracts/   TypeSpec-контракт API (источник правды)
+openapi/     сгенерированная OpenAPI-спецификация
+docs/        контексты работы над задачами и агентские инструкции
+```
+
+CI — GitHub Actions на каждый push и PR: Backend CI (fmt, clippy, тесты),
+Frontend CI (eslint, vitest, build), Security (cargo/npm audit), hexlet-check
+(собирает Docker-образ и запускает приложение), release-please (release-PR
+после мержа в `main`).
+
+## Известные ограничения
+
+- Хранилище в памяти: данные живут до перезапуска процесса (до появления БД).
+- Авторизации нет: админ-мутации (`POST /api/event-types`, `/api/slots`)
+  публично доступны — осознанный компромисс учебного демо, решение
+  отслеживается в
+  [issue #23](https://github.com/TimG9v/ai-for-developers-project-386/issues/23).
+- Free-инстанс Render засыпает при простое (см. «Публичный деплой»).
 
 ---
 

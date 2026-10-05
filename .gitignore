@@ -1,0 +1,12 @@
+context/tmp*
+
+target/
+node_modules/
+.next/
+dist/
+*.tsbuildinfo
+.env*.local
+tmp*
+
+# локальная конфигурация OpenCode этого проекта
+opencode.json

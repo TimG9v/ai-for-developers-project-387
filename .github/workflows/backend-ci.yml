@@ -1,0 +1,51 @@
+name: Backend CI
+
+on:
+  # прогон на каждый push во все ветки — критерий приёмки шага 1/4.
+  # paths-фильтр только на pull_request: экономия минут на PR из форков;
+  # на ветках этого же репо CI и так запускается push-триггером.
+  push:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".tool-versions"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust
+        # версия зеркалит .tool-versions
+        id: rust
+        uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          # экшен ставит тулчейн с --profile minimal,
+          # без components rustfmt/clippy отсутствуют
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            backend/target
+          # cachekey из экшена: сброс кэша при смене версии тулчейна
+          key: ${{ runner.os }}-cargo-${{ hashFiles('backend/Cargo.lock') }}-${{ steps.rust.outputs.cachekey }}
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test
