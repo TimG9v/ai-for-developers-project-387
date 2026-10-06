@@ -1,0 +1,36 @@
+name: opencode-triage
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+        with:
+          model: zai-coding-plan/glm-5.3-flash
+          share: false
+          prompt: |
+            Затриажь эту issue как участник команды календарного приложения.
+            Оставь один комментарий с разбором:
+            1. Суть проблемы своими словами: что сломано и у кого.
+            2. Причина в коде: какие файлы и модули отвечают за описанное
+               поведение и почему оно такое (проверь backend/ и frontend/).
+            3. Предлагаемый путь исправления по шагам.
+            Если данных в issue не хватает, задай уточняющие вопросы в том
+            же комментарии. Если сообщение не про приложение, объясни это
+            и предложи закрыть issue.
