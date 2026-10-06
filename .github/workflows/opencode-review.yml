@@ -1,0 +1,44 @@
+name: opencode-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: read
+      issues: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: zai-coding-plan/glm-5.3-flash
+          share: false
+          use_github_token: true
+          prompt: |
+            Проведи первое ревью этого pull request как участник команды
+            календарного приложения. Критерии:
+            1. Коммиты PR — по Conventional Commits (feat/fix/ci/docs/...).
+            2. Контракт прежде всего: сгенерированные файлы
+               (frontend/src/client/, серверные типы backend) не правятся
+               руками — только перегенерация из contracts/main.tsp.
+            3. Потенциальные баги: необработанные 404/409, гонки при
+               бронировании слота, валидация входных данных.
+            4. Соответствие правилам AGENTS.md (стиль, типы, тесты).
+            Оставь замечания комментарием к pull request: каждое —
+            отдельным пунктом, с файлом и строкой. Если замечаний нет —
+            короткое резюме «существенных замечаний нет».
+            Не мержи и не одобряй PR.
