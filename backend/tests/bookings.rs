@@ -38,7 +38,9 @@ fn seeded_state() -> backend::AppState {
     event_types.add(event_type("et1", 30));
     event_types.add(event_type("et2", 60));
     let slots = InMemorySlots::new();
-    let start = Utc::now() + Duration::days(1);
+    // Начало на 30-минутной сетке: seeded-слоты участвуют и в переносах,
+    // где сетку проверяет validate_reschedule.
+    let start = common::floor_grid(Utc::now() + Duration::days(1));
     slots.add(slot("s1", "et1", start, 30));
     slots.add(slot("s2", "et2", start, 60));
     slots.add(slot("s4", "et2", start + Duration::minutes(30), 60));
@@ -413,6 +415,29 @@ async fn bookings_reschedule_to_slot_outside_window_returns_400() {
     .await;
 
     assert!(raw.contains("HTTP/1.1 400"), "got: {raw}");
+}
+
+#[tokio::test]
+async fn bookings_reschedule_to_off_grid_slot_returns_400() {
+    let state = seeded_state();
+    // et1, начало через день + 17 минут от сетки — вне 30-минутной сетки;
+    // сеян напрямую, поэтому сетку ловит только validate_reschedule.
+    let base = common::floor_grid(Utc::now() + Duration::days(1));
+    state
+        .slots
+        .add(slot("s-off-grid", "et1", base + Duration::minutes(17), 30));
+    let app = backend::app_with_state(state);
+    seed_booking(&app, "b1", "s1").await;
+
+    let raw = common::send(
+        app,
+        &common::post_request("/bookings/b1/reschedule", r#"{"newSlotId":"s-off-grid"}"#),
+    )
+    .await;
+    assert!(
+        raw.contains("HTTP/1.1 400"),
+        "вне сетки — 400, не 404: {raw}"
+    );
 }
 
 #[tokio::test]

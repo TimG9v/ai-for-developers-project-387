@@ -51,3 +51,14 @@ pub fn delete_request(path: &str) -> String {
 pub fn response_body(raw: &str) -> &str {
     raw.split("\r\n\r\n").nth(1).expect("response body")
 }
+
+/// Привязка вниз к 30-минутной сетке UTC (…:00 / …:30): для фикстур,
+/// начинающихся «сейчас + N дней», чтобы серверная сетка слотов
+/// не ломала happy-path тесты.
+pub fn floor_grid(t: chrono::DateTime<chrono::Utc>) -> chrono::DateTime<chrono::Utc> {
+    use chrono::SubsecRound;
+
+    let whole = t.trunc_subsecs(0);
+    let rem = whole.timestamp().rem_euclid(1800);
+    whole - chrono::Duration::seconds(rem)
+}

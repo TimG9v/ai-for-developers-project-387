@@ -228,6 +228,7 @@ async fn reschedule_booking(
     match state.bookings.reschedule(&id, &new_slot) {
         Ok(updated) => Json(updated).into_response(),
         Err(RescheduleError::NewSlotTaken) => StatusCode::CONFLICT.into_response(),
+        Err(RescheduleError::NewSlotOffGrid) => StatusCode::BAD_REQUEST.into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }

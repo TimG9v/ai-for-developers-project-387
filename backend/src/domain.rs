@@ -74,17 +74,28 @@ pub fn is_within_booking_window(start: DateTime<Utc>, now: DateTime<Utc>) -> boo
     start >= now && start <= now + Duration::days(BOOKING_WINDOW_DAYS)
 }
 
+/// Шаг сетки начала слота — 30 минут (обязательное требование проекта).
+const SLOT_GRID_SECONDS: i64 = 30 * 60;
+
+/// Начало слота на 30-минутной сетке: …:00 / …:30, секунды и доли — ноль.
+/// Суб-секунды проверяются отдельно: timestamp() их отбрасывает.
+pub fn is_on_grid(start: DateTime<Utc>) -> bool {
+    start.timestamp_subsec_nanos() == 0 && start.timestamp().rem_euclid(SLOT_GRID_SECONDS) == 0
+}
+
 /// Причины отклонения слота сервером.
 #[derive(Debug)]
 pub enum SlotValidationError {
     EndBeforeStart,
     OutsideBookingWindow,
     DurationMismatch,
+    OffGridStart,
 }
 
 /// Серверная валидация слота: интервал непустой, начало в окне 14 дней,
 /// длительность интервала равна длительности типа встречи
-/// (словарь: «длительность слота определяется его типом встречи»).
+/// (словарь: «длительность слота определяется его типом встречи»),
+/// начало на 30-минутной сетке.
 pub fn validate_slot(
     slot: &Slot,
     now: DateTime<Utc>,
@@ -99,6 +110,9 @@ pub fn validate_slot(
     let actual_minutes = (slot.end_date_time - slot.start_date_time).num_minutes();
     if actual_minutes != i64::from(event_type.duration_minutes) {
         return Err(SlotValidationError::DurationMismatch);
+    }
+    if !is_on_grid(slot.start_date_time) {
+        return Err(SlotValidationError::OffGridStart);
     }
     Ok(())
 }
@@ -138,13 +152,15 @@ pub enum RescheduleError {
     NewSlotNotFound,
     EventTypeMismatch,
     NewSlotOutsideWindow,
+    NewSlotOffGrid,
     NewSlotTaken,
 }
 
 /// Серверная валидация переноса: новый слот — того же типа встречи
-/// (длительность слота определяется типом) и в окне 14 дней.
-/// Существование записи и нового слота проверяет роутер; занятость нового
-/// слота — отдельно и атомарно (BookingsRepository::reschedule).
+/// (длительность слота определяется типом), в окне 14 дней и на
+/// 30-минутной сетке. Существование записи и нового слота проверяет роутер;
+/// занятость нового слота — отдельно и атомарно
+/// (BookingsRepository::reschedule).
 pub fn validate_reschedule(
     old_slot: &Slot,
     new_slot: &Slot,
@@ -155,6 +171,9 @@ pub fn validate_reschedule(
     }
     if !is_within_booking_window(new_slot.start_date_time, now) {
         return Err(RescheduleError::NewSlotOutsideWindow);
+    }
+    if !is_on_grid(new_slot.start_date_time) {
+        return Err(RescheduleError::NewSlotOffGrid);
     }
     Ok(())
 }

@@ -57,10 +57,46 @@ fn slot_body(
     )
 }
 
+/// Привязка вниз к 30-минутной сетке — общий хелпер common::floor_grid.
+#[tokio::test]
+async fn slots_create_rejects_off_grid_start_with_400() {
+    // Обязательное требование: шаг слотов 30 минут. 10:17 и :00:15 — вне сетки.
+    let state = seeded_state();
+    let app = backend::app_with_state(state.clone());
+    let base = common::floor_grid(Utc::now() + Duration::days(1));
+
+    let cases: Vec<(String, &str)> = vec![
+        (
+            slot_body(
+                "et1",
+                base + Duration::minutes(17),
+                base + Duration::minutes(47),
+            ),
+            "начало :17",
+        ),
+        (
+            slot_body(
+                "et1",
+                base + Duration::seconds(15),
+                base + Duration::minutes(30) + Duration::seconds(15),
+            ),
+            "начало :00:15",
+        ),
+    ];
+
+    for (body, label) in cases {
+        let raw = common::send(app.clone(), &common::post_request("/slots", &body)).await;
+        assert!(
+            raw.contains("HTTP/1.1 400"),
+            "слот вне сетки ({label}) должен отклоняться 400, got: {raw}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn slots_create_returns_created_slot_and_it_is_listed() {
     let state = seeded_state();
-    let start = Utc::now() + Duration::days(1);
+    let start = common::floor_grid(Utc::now() + Duration::days(1));
     let end = start + Duration::minutes(30);
     let app = backend::app_with_state(state.clone());
 
@@ -163,8 +199,9 @@ async fn slots_create_rejects_out_of_window_and_bad_intervals_with_400() {
 #[tokio::test]
 async fn slots_create_accepts_day_14_boundary() {
     let state = seeded_state();
-    // Слот, начинающийся в 14-й день, — валиден (решение сессии).
-    let start = Utc::now() + Duration::days(14);
+    // Слот, начинающийся в 14-й день, — валиден (решение сессии);
+    // floor_grid(now) + 14d <= now + 14d — граница окна соблюдена.
+    let start = common::floor_grid(Utc::now()) + Duration::days(14);
     let end = start + Duration::minutes(30);
     let app = backend::app_with_state(state);
 
