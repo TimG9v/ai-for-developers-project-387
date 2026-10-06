@@ -69,6 +69,34 @@ describe("booking manage", () => {
     expect(await screen.findByText("Запись не найдена")).toBeTruthy();
   });
 
+  it("shows an error screen with retry when loading fails", async () => {
+    upcomingMeetingsList.mockRejectedValueOnce(new Error("network down"));
+    upcomingMeetingsList.mockResolvedValueOnce({ data: [MEETING] });
+
+    render(<BookingManage bookingId="b1" />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Не удалось загрузить запись");
+    expect(screen.queryByText("Загружаем запись…")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Повторить" }));
+
+    expect(await screen.findByText("«Созвон»")).toBeTruthy();
+    expect(upcomingMeetingsList).toHaveBeenCalledTimes(2);
+  });
+
+  it("stays on the error screen when the retry fails too", async () => {
+    upcomingMeetingsList.mockRejectedValueOnce(new Error("network down"));
+    upcomingMeetingsList.mockRejectedValueOnce(new Error("still down"));
+
+    render(<BookingManage bookingId="b1" />);
+
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Повторить" }));
+
+    expect(await screen.findByText("Не удалось загрузить запись")).toBeTruthy();
+  });
+
   it("shows missing for an empty id without fetching", async () => {
     render(<BookingManage bookingId="" />);
 

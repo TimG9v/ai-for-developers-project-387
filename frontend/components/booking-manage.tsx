@@ -25,6 +25,7 @@ import { formatSlotInterval } from "@/lib/slot-time";
 type ManageView =
   | { kind: "loading" }
   | { kind: "missing" }
+  | { kind: "error" }
   | { kind: "cancelled" }
   | { kind: "meeting"; meeting: UpcomingMeeting }
   | { kind: "choosing-slot"; meeting: UpcomingMeeting; slots: Slot[] };
@@ -35,6 +36,9 @@ export function BookingManage({ bookingId }: { bookingId: string }) {
     bookingId === "" ? { kind: "missing" } : { kind: "loading" },
   );
   const [message, setMessage] = useState<string | null>(null);
+  // Повторная попытка загрузки после сетевой ошибки: смена ключа перезапускает
+  // эффект загрузки ниже.
+  const [reloadKey, setReloadKey] = useState(0);
 
   const findMeeting = useCallback(async (): Promise<UpcomingMeeting | null> => {
     const { data } = await upcomingMeetingsList();
@@ -46,17 +50,24 @@ export function BookingManage({ bookingId }: { bookingId: string }) {
       return;
     }
     let active = true;
-    void findMeeting().then((meeting) => {
-      if (active) {
-        setView(
-          meeting ? { kind: "meeting", meeting } : { kind: "missing" },
-        );
-      }
-    });
+    void findMeeting()
+      .then((meeting) => {
+        if (active) {
+          setView(
+            meeting ? { kind: "meeting", meeting } : { kind: "missing" },
+          );
+        }
+      })
+      .catch(() => {
+        // Сетевая ошибка — не «запись не найдена»: даём гостю повторить.
+        if (active) {
+          setView({ kind: "error" });
+        }
+      });
     return () => {
       active = false;
     };
-  }, [bookingId, findMeeting]);
+  }, [bookingId, findMeeting, reloadKey]);
 
   async function handleCancel() {
     setMessage(null);
@@ -123,6 +134,30 @@ export function BookingManage({ bookingId }: { bookingId: string }) {
 
   if (view.kind === "loading") {
     return <p className="text-muted-foreground">Загружаем запись…</p>;
+  }
+
+  if (view.kind === "error") {
+    return (
+      <div
+        role="alert"
+        className="flex w-full flex-col gap-2 rounded-xl border bg-card p-6 text-card-foreground"
+      >
+        <p>Не удалось загрузить запись</p>
+        <p className="text-sm text-muted-foreground">
+          Похоже, проблема с соединением. Попробуйте ещё раз.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setView({ kind: "loading" });
+            setReloadKey((key) => key + 1);
+          }}
+          className="self-start rounded-lg bg-primary px-4 py-2 text-primary-foreground"
+        >
+          Повторить
+        </button>
+      </div>
+    );
   }
 
   if (view.kind === "missing") {
