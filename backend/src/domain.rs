@@ -46,9 +46,10 @@ pub trait SlotsRepository: Send + Sync {
 
 /// Репозиторий записей; имплементации живут в инфраструктуре.
 pub trait BookingsRepository: Send + Sync {
-    /// Атомарный insert-if-absent: одна Запись на Слот (решение карты #5).
-    /// Возвращает false, если слот уже занят.
-    fn try_add(&self, booking: Booking) -> bool;
+    /// Атомарный insert-if-absent: записи не пересекаются по интервалу
+    /// времени слота — ни дважды на одном слоте, ни между слотами разных
+    /// типов встреч (ADR 0004). Возвращает false, если интервал занят.
+    fn try_add(&self, booking: Booking, slot: &Slot) -> bool;
 
     /// Занят ли слот какой-либо записью.
     fn contains_slot(&self, slot_id: &str) -> bool;
@@ -62,9 +63,9 @@ pub trait BookingsRepository: Send + Sync {
     /// Удалить запись по id; true — запись была и отменена.
     fn remove(&self, id: &str) -> bool;
 
-    /// Атомарный перенос записи на новый слот: занятость нового слота и
-    /// смена слота — под одной блокировкой (по образцу try_add).
-    fn reschedule(&self, booking_id: &str, new_slot_id: &str) -> Result<Booking, RescheduleError>;
+    /// Атомарный перенос записи на новый слот: занятость интервала нового
+    /// слота и смена слота — под одной блокировкой (по образцу try_add).
+    fn reschedule(&self, booking_id: &str, new_slot: &Slot) -> Result<Booking, RescheduleError>;
 }
 
 /// Слот виден в календаре записи, только если начинается в окне 14 дней:

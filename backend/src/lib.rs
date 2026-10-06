@@ -185,7 +185,7 @@ async fn create_booking(
     if domain::validate_booking(&booking, &slot, Utc::now()).is_err() {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    if !state.bookings.try_add(booking.clone()) {
+    if !state.bookings.try_add(booking.clone(), &slot) {
         return StatusCode::CONFLICT.into_response();
     }
     Json(booking).into_response()
@@ -225,7 +225,7 @@ async fn reschedule_booking(
     if domain::validate_reschedule(&old_slot, &new_slot, Utc::now()).is_err() {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    match state.bookings.reschedule(&id, &new_slot.id) {
+    match state.bookings.reschedule(&id, &new_slot) {
         Ok(updated) => Json(updated).into_response(),
         Err(RescheduleError::NewSlotTaken) => StatusCode::CONFLICT.into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),

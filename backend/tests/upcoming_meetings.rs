@@ -31,21 +31,26 @@ fn seeded_state() -> backend::AppState {
     });
     let slots = InMemorySlots::new();
     let start = Utc::now() + Duration::days(1);
-    slots.add(Slot {
+    let s1 = Slot {
         id: "s1".to_string(),
         event_type_id: "et1".to_string(),
         start_date_time: start,
         end_date_time: start + Duration::minutes(30),
-    });
-    slots.add(Slot {
+    };
+    let s_past = Slot {
         id: "s-past".to_string(),
         event_type_id: "et1".to_string(),
         start_date_time: Utc::now() - Duration::days(30),
         end_date_time: Utc::now() - Duration::days(30) + Duration::minutes(30),
-    });
+    };
+    slots.add(s1.clone());
+    slots.add(s_past.clone());
     let bookings = InMemoryBookings::new();
-    bookings.try_add(booking("b1", "s1", "Гость", "g@example.com"));
-    bookings.try_add(booking("b-past", "s-past", "Прошедший", "past@example.com"));
+    bookings.try_add(booking("b1", "s1", "Гость", "g@example.com"), &s1);
+    bookings.try_add(
+        booking("b-past", "s-past", "Прошедший", "past@example.com"),
+        &s_past,
+    );
     backend::AppState {
         event_types: Arc::new(event_types),
         slots: Arc::new(slots),
