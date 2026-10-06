@@ -85,6 +85,16 @@ mod tests {
                 "окно 14 дней"
             );
         }
+        // Демо-слоты не пересекаются попарно (ADR 0004): гость может
+        // забронировать любой предложенный, не упираясь в 409.
+        for (i, a) in published.iter().enumerate() {
+            for b in published.iter().skip(i + 1) {
+                assert!(
+                    a.end_date_time <= b.start_date_time || b.end_date_time <= a.start_date_time,
+                    "демо-слоты пересекаются: {a:?} и {b:?}"
+                );
+            }
+        }
     }
 
     #[test]

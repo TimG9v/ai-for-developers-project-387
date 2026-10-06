@@ -82,6 +82,14 @@ async fn slots_create_rejects_off_grid_start_with_400() {
             ),
             "начало :00:15",
         ),
+        (
+            slot_body(
+                "et1",
+                base + Duration::milliseconds(500),
+                base + Duration::minutes(30) + Duration::milliseconds(500),
+            ),
+            "начало :00.500",
+        ),
     ];
 
     for (body, label) in cases {
