@@ -1,6 +1,7 @@
 pub mod api;
 pub mod domain;
 pub mod infra;
+pub mod seed;
 
 use std::sync::Arc;
 
