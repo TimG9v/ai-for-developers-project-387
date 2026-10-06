@@ -1,6 +1,7 @@
-//! HTTP-шов: запись гостя на слот. Атомарность слота (одна Запись на Слот),
-//! конфликты 409, несуществующий слот 404, обязательность гостя 400,
-//! единое окно 14 дней. Занятые слоты исчезают из календаря.
+//! HTTP-шов: запись гостя на слот. Атомарность интервала (записи не
+//! пересекаются по времени, ADR 0004), конфликты 409, несуществующий слот
+//! 404, обязательность гостя 400, единое окно 14 дней. Слоты, занятые по
+//! времени, исчезают из календаря.
 
 mod common;
 
@@ -115,6 +116,32 @@ async fn bookings_create_second_booking_on_same_slot_returns_409() {
         "повторная запись на s1 должна быть 409, got: {second}"
     );
     // Пересечение слотов разных типов — отдельный тест (ADR 0004).
+}
+
+#[tokio::test]
+async fn slots_list_hides_slots_overlapping_booked_interval() {
+    // ADR 0004 в read-пути: календарь не предлагает слоты, чей интервал
+    // пересекается с занятым, — даже слоты других типов; стык остаётся видим.
+    let app = backend::app_with_state(seeded_state());
+    seed_booking(&app, "b1", "s1").await; // et1: start..start+30
+
+    let raw = common::send(app, &common::get_request("/slots?eventTypeId=et2")).await;
+    let items: serde_json::Value =
+        serde_json::from_str(common::response_body(&raw)).expect("JSON-тело");
+    let ids: Vec<&str> = items
+        .as_array()
+        .expect("Slot[]")
+        .iter()
+        .map(|slot| slot["id"].as_str().expect("id"))
+        .collect();
+    assert!(
+        !ids.contains(&"s2"),
+        "пересекающийся с бронью слот скрыт из календаря: {items}"
+    );
+    assert!(
+        ids.contains(&"s4"),
+        "слот, стыкующийся с бронью, доступен: {items}"
+    );
 }
 
 #[tokio::test]

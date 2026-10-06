@@ -93,8 +93,10 @@ struct SlotsQuery {
     event_type_id: Option<String>,
 }
 
-/// Календарь записи: свободные слоты выбранного типа в окне 14 дней;
-/// занятые (с записью) не отдаются (история 14).
+/// Календарь записи: свободные слоты выбранного типа в окне 14 дней.
+/// Занятые по времени не отдаются (история 14, ADR 0004): слот, чей
+/// интервал пересекается с любой записью, — недоступен, даже если это
+/// слот другого типа; стык с занятым интервалом остаётся свободным.
 async fn list_slots(State(state): State<AppState>, query: Query<SlotsQuery>) -> Json<Vec<Slot>> {
     let now: DateTime<Utc> = Utc::now();
     let slots = state
@@ -108,7 +110,11 @@ async fn list_slots(State(state): State<AppState>, query: Query<SlotsQuery>) -> 
                 .is_none_or(|id| slot.event_type_id == id)
         })
         .filter(|slot| domain::is_within_booking_window(slot.start_date_time, now))
-        .filter(|slot| !state.bookings.contains_slot(&slot.id))
+        .filter(|slot| {
+            !state
+                .bookings
+                .is_interval_taken(slot.start_date_time, slot.end_date_time)
+        })
         .collect();
     Json(slots)
 }
@@ -194,7 +200,7 @@ async fn create_booking(
 
 /// Отмена записи — гостем по ссылке управления (id записи из подтверждения,
 /// АDR 0002) или владельцем из админки. Слот освобождается сам: календарь
-/// фильтрует занятые по `contains_slot`. Несуществующая запись — 404.
+/// фильтрует занятые интервалы (`is_interval_taken`). Несуществующая запись — 404.
 async fn cancel_booking(State(state): State<AppState>, Path(id): Path<String>) -> Response {
     if state.bookings.remove(&id) {
         return StatusCode::NO_CONTENT.into_response();

@@ -54,6 +54,10 @@ pub trait BookingsRepository: Send + Sync {
     /// Занят ли слот какой-либо записью.
     fn contains_slot(&self, slot_id: &str) -> bool;
 
+    /// Занят ли интервал времени какой-либо записью (ADR 0004): true —
+    /// пересекается с интервалом хотя бы одной записи.
+    fn is_interval_taken(&self, start: DateTime<Utc>, end: DateTime<Utc>) -> bool;
+
     /// Запись по идентификатору (ссылка управления записью).
     fn get(&self, id: &str) -> Option<Booking>;
 
