@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const upcomingMeetingsList = vi.fn();
@@ -53,12 +60,21 @@ describe("admin page lists upcoming meetings", () => {
     expect(screen.getByText("Пока нет записей")).toBeTruthy();
   });
 
-  it("lets the owner cancel a booking from the meeting card", async () => {
+  it("cancels only after the second confirming click", async () => {
     upcomingMeetingsList.mockResolvedValueOnce({ data: [MEETING] });
     bookingsCancel.mockResolvedValueOnce({ data: undefined });
 
     render(await Page());
     fireEvent.click(screen.getByRole("button", { name: "Отменить запись b1" }));
+
+    // Первый клик только спрашивает подтверждение — запись ещё на месте.
+    const confirm = screen.getByRole("button", {
+      name: "Подтвердите отмену записи b1",
+    });
+    expect(confirm.textContent).toContain("Точно отменить?");
+    expect(bookingsCancel).not.toHaveBeenCalled();
+
+    fireEvent.click(confirm);
 
     await waitFor(() => {
       expect(bookingsCancel).toHaveBeenCalledWith({ path: { id: "b1" } });
@@ -68,12 +84,41 @@ describe("admin page lists upcoming meetings", () => {
     });
   });
 
+  it("reverts the button when confirmation is not given in time", async () => {
+    vi.useFakeTimers();
+    try {
+      upcomingMeetingsList.mockResolvedValueOnce({ data: [MEETING] });
+
+      render(await Page());
+      fireEvent.click(
+        screen.getByRole("button", { name: "Отменить запись b1" }),
+      );
+      expect(
+        screen.getByRole("button", { name: "Подтвердите отмену записи b1" }),
+      ).toBeTruthy();
+
+      act(() => {
+        vi.advanceTimersByTime(4000);
+      });
+
+      expect(
+        screen.getByRole("button", { name: "Отменить запись b1" }),
+      ).toBeTruthy();
+      expect(bookingsCancel).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("explains a failed cancellation instead of breaking", async () => {
     upcomingMeetingsList.mockResolvedValueOnce({ data: [MEETING] });
     bookingsCancel.mockResolvedValueOnce({ data: undefined, error: { status: 500 } });
 
     render(await Page());
     fireEvent.click(screen.getByRole("button", { name: "Отменить запись b1" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Подтвердите отмену записи b1" }),
+    );
 
     await waitFor(() => {
       expect(screen.getByRole("alert").textContent).toContain("Не удалось отменить");
