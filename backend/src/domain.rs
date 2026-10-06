@@ -53,8 +53,18 @@ pub trait BookingsRepository: Send + Sync {
     /// Занят ли слот какой-либо записью.
     fn contains_slot(&self, slot_id: &str) -> bool;
 
+    /// Запись по идентификатору (ссылка управления записью).
+    fn get(&self, id: &str) -> Option<Booking>;
+
     /// Все записи — ракурс владельца (история 4).
     fn list(&self) -> Vec<Booking>;
+
+    /// Удалить запись по id; true — запись была и отменена.
+    fn remove(&self, id: &str) -> bool;
+
+    /// Атомарный перенос записи на новый слот: занятость нового слота и
+    /// смена слота — под одной блокировкой (по образцу try_add).
+    fn reschedule(&self, booking_id: &str, new_slot_id: &str) -> Result<Booking, RescheduleError>;
 }
 
 /// Слот виден в календаре записи, только если начинается в окне 14 дней:
@@ -116,6 +126,34 @@ pub fn validate_booking(
     }
     if !is_within_booking_window(slot.start_date_time, now) {
         return Err(BookingValidationError::SlotOutsideWindow);
+    }
+    Ok(())
+}
+
+/// Причины отклонения переноса записи сервером.
+#[derive(Debug, PartialEq)]
+pub enum RescheduleError {
+    BookingNotFound,
+    NewSlotNotFound,
+    EventTypeMismatch,
+    NewSlotOutsideWindow,
+    NewSlotTaken,
+}
+
+/// Серверная валидация переноса: новый слот — того же типа встречи
+/// (длительность слота определяется типом) и в окне 14 дней.
+/// Существование записи и нового слота проверяет роутер; занятость нового
+/// слота — отдельно и атомарно (BookingsRepository::reschedule).
+pub fn validate_reschedule(
+    old_slot: &Slot,
+    new_slot: &Slot,
+    now: DateTime<Utc>,
+) -> Result<(), RescheduleError> {
+    if old_slot.event_type_id != new_slot.event_type_id {
+        return Err(RescheduleError::EventTypeMismatch);
+    }
+    if !is_within_booking_window(new_slot.start_date_time, now) {
+        return Err(RescheduleError::NewSlotOutsideWindow);
     }
     Ok(())
 }

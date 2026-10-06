@@ -1,21 +1,32 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const upcomingMeetingsList = vi.fn();
+const bookingsCancel = vi.fn();
+const routerRefresh = vi.fn();
 
 vi.mock("@/src/client", () => ({
   upcomingMeetingsList: (...args: unknown[]) => upcomingMeetingsList(...args),
   eventTypesList: vi.fn(async () => ({ data: [] })),
+  bookingsCancel: (...args: unknown[]) => bookingsCancel(...args),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: routerRefresh }),
 }));
 
 import Page from "@/app/admin/page";
 
 const slotStart = new Date(2026, 10, 15, 10, 0);
 const slotEnd = new Date(2026, 10, 15, 10, 30);
-const pastStart = new Date(2025, 0, 1, 10, 0);
-const pastEnd = new Date(2025, 0, 1, 10, 30);
 
-const EVENT_TYPES = [{ id: "et1", title: "Созвон", durationMinutes: 30 }];
 const MEETING = {
   id: "b1",
   slotId: "s1",
@@ -47,5 +58,71 @@ describe("admin page lists upcoming meetings", () => {
     render(await Page());
 
     expect(screen.getByText("Пока нет записей")).toBeTruthy();
+  });
+
+  it("cancels only after the second confirming click", async () => {
+    upcomingMeetingsList.mockResolvedValueOnce({ data: [MEETING] });
+    bookingsCancel.mockResolvedValueOnce({ data: undefined });
+
+    render(await Page());
+    fireEvent.click(screen.getByRole("button", { name: "Отменить запись b1" }));
+
+    // Первый клик только спрашивает подтверждение — запись ещё на месте.
+    const confirm = screen.getByRole("button", {
+      name: "Подтвердите отмену записи b1",
+    });
+    expect(confirm.textContent).toContain("Точно отменить?");
+    expect(bookingsCancel).not.toHaveBeenCalled();
+
+    fireEvent.click(confirm);
+
+    await waitFor(() => {
+      expect(bookingsCancel).toHaveBeenCalledWith({ path: { id: "b1" } });
+    });
+    await waitFor(() => {
+      expect(routerRefresh).toHaveBeenCalled();
+    });
+  });
+
+  it("reverts the button when confirmation is not given in time", async () => {
+    vi.useFakeTimers();
+    try {
+      upcomingMeetingsList.mockResolvedValueOnce({ data: [MEETING] });
+
+      render(await Page());
+      fireEvent.click(
+        screen.getByRole("button", { name: "Отменить запись b1" }),
+      );
+      expect(
+        screen.getByRole("button", { name: "Подтвердите отмену записи b1" }),
+      ).toBeTruthy();
+
+      act(() => {
+        vi.advanceTimersByTime(4000);
+      });
+
+      expect(
+        screen.getByRole("button", { name: "Отменить запись b1" }),
+      ).toBeTruthy();
+      expect(bookingsCancel).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("explains a failed cancellation instead of breaking", async () => {
+    upcomingMeetingsList.mockResolvedValueOnce({ data: [MEETING] });
+    bookingsCancel.mockResolvedValueOnce({ data: undefined, error: { status: 500 } });
+
+    render(await Page());
+    fireEvent.click(screen.getByRole("button", { name: "Отменить запись b1" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Подтвердите отмену записи b1" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("Не удалось отменить");
+    });
+    expect(routerRefresh).not.toHaveBeenCalled();
   });
 });

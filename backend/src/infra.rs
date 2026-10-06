@@ -4,7 +4,7 @@
 use std::sync::Mutex;
 
 use crate::api::api_types::{Booking, EventType, Slot};
-use crate::domain::{BookingsRepository, EventTypesRepository, SlotsRepository};
+use crate::domain::{BookingsRepository, EventTypesRepository, RescheduleError, SlotsRepository};
 
 #[derive(Default)]
 pub struct InMemoryEventTypes {
@@ -103,7 +103,39 @@ impl BookingsRepository for InMemoryBookings {
             .any(|booking| booking.slot_id == slot_id)
     }
 
+    fn get(&self, id: &str) -> Option<Booking> {
+        self.items
+            .lock()
+            .expect("bookings lock")
+            .iter()
+            .find(|booking| booking.id == id)
+            .cloned()
+    }
+
     fn list(&self) -> Vec<Booking> {
         self.items.lock().expect("bookings lock").clone()
+    }
+
+    fn remove(&self, id: &str) -> bool {
+        let mut items = self.items.lock().expect("bookings lock");
+        let before = items.len();
+        items.retain(|booking| booking.id != id);
+        items.len() < before
+    }
+
+    fn reschedule(&self, booking_id: &str, new_slot_id: &str) -> Result<Booking, RescheduleError> {
+        // Занятость нового слота и смена слота — под одной блокировкой:
+        // два одновременных переноса (или перенос и запись) не устроят
+        // вторую запись на слот.
+        let mut items = self.items.lock().expect("bookings lock");
+        if items.iter().any(|existing| existing.slot_id == new_slot_id) {
+            return Err(RescheduleError::NewSlotTaken);
+        }
+        let booking = items
+            .iter_mut()
+            .find(|booking| booking.id == booking_id)
+            .ok_or(RescheduleError::BookingNotFound)?;
+        booking.slot_id = new_slot_id.to_string();
+        Ok(booking.clone())
     }
 }

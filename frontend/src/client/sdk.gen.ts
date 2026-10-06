@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BookingsCreateData, BookingsCreateErrors, BookingsCreateResponses, BookingsListData, BookingsListResponses, EventTypesCreateData, EventTypesCreateErrors, EventTypesCreateResponses, EventTypesListData, EventTypesListResponses, SlotsCreateData, SlotsCreateErrors, SlotsCreateResponses, SlotsListData, SlotsListResponses, UpcomingMeetingsListData, UpcomingMeetingsListResponses } from './types.gen';
+import type { BookingsCancelData, BookingsCancelErrors, BookingsCancelResponses, BookingsCreateData, BookingsCreateErrors, BookingsCreateResponses, BookingsListData, BookingsListResponses, BookingsRescheduleData, BookingsRescheduleErrors, BookingsRescheduleResponses, EventTypesCreateData, EventTypesCreateErrors, EventTypesCreateResponses, EventTypesListData, EventTypesListResponses, SlotsCreateData, SlotsCreateErrors, SlotsCreateResponses, SlotsListData, SlotsListResponses, UpcomingMeetingsListData, UpcomingMeetingsListResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -22,6 +22,23 @@ export const bookingsList = <ThrowOnError extends boolean = false>(options?: Opt
 
 export const bookingsCreate = <ThrowOnError extends boolean = false>(options: Options<BookingsCreateData, ThrowOnError>): RequestResult<BookingsCreateResponses, BookingsCreateErrors, ThrowOnError> => (options.client ?? client).post<BookingsCreateResponses, BookingsCreateErrors, ThrowOnError>({
     url: '/bookings',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Отмена записи: слот освобождается и снова появляется в календаре.
+ */
+export const bookingsCancel = <ThrowOnError extends boolean = false>(options: Options<BookingsCancelData, ThrowOnError>): RequestResult<BookingsCancelResponses, BookingsCancelErrors, ThrowOnError> => (options.client ?? client).delete<BookingsCancelResponses, BookingsCancelErrors, ThrowOnError>({ url: '/bookings/{id}', ...options });
+
+/**
+ * Перенос записи на другой свободный слот того же типа встречи.
+ */
+export const bookingsReschedule = <ThrowOnError extends boolean = false>(options: Options<BookingsRescheduleData, ThrowOnError>): RequestResult<BookingsRescheduleResponses, BookingsRescheduleErrors, ThrowOnError> => (options.client ?? client).post<BookingsRescheduleResponses, BookingsRescheduleErrors, ThrowOnError>({
+    url: '/bookings/{id}/reschedule',
     ...options,
     headers: {
         'Content-Type': 'application/json',

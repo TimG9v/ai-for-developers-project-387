@@ -6,16 +6,16 @@ use std::sync::Arc;
 
 use axum::{
     Json, Router,
-    extract::{Query, State, rejection::JsonRejection},
+    extract::{Path, Query, State, rejection::JsonRejection},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{delete, get, post},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::api::api_types::{Booking, EventType, Slot};
-use crate::domain::{BookingsRepository, EventTypesRepository, SlotsRepository};
+use crate::api::api_types::{Booking, EventType, RescheduleRequest, Slot};
+use crate::domain::{BookingsRepository, EventTypesRepository, RescheduleError, SlotsRepository};
 
 /// Адрес для `TcpListener::bind`: loopback, порт из `BACKEND_PORT`
 /// (дефолт 8081). `PORT` — не здесь: это публичный порт Next.js в контейнере.
@@ -55,6 +55,8 @@ pub fn app_with_state(state: AppState) -> Router {
         )
         .route("/slots", get(list_slots).post(create_slot))
         .route("/bookings", get(list_bookings).post(create_booking))
+        .route("/bookings/{id}", delete(cancel_booking))
+        .route("/bookings/{id}/reschedule", post(reschedule_booking))
         .route("/upcoming-meetings", get(list_upcoming_meetings))
         .with_state(state)
 }
@@ -187,6 +189,47 @@ async fn create_booking(
         return StatusCode::CONFLICT.into_response();
     }
     Json(booking).into_response()
+}
+
+/// Отмена записи — гостем по ссылке управления (id записи из подтверждения,
+/// АDR 0002) или владельцем из админки. Слот освобождается сам: календарь
+/// фильтрует занятые по `contains_slot`. Несуществующая запись — 404.
+async fn cancel_booking(State(state): State<AppState>, Path(id): Path<String>) -> Response {
+    if state.bookings.remove(&id) {
+        return StatusCode::NO_CONTENT.into_response();
+    }
+    StatusCode::NOT_FOUND.into_response()
+}
+
+/// Перенос записи на другой свободный слот того же типа встречи (история 7).
+/// Несуществующие запись/слот и чужой тип — 404/400; занятость нового слота
+/// и смена слота атомарны, гонка двух запросов даёт контрактный 409.
+async fn reschedule_booking(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    body: Result<Json<RescheduleRequest>, JsonRejection>,
+) -> Response {
+    let request = match body {
+        Ok(Json(request)) => request,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    let Some(booking) = state.bookings.get(&id) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let Some(old_slot) = state.slots.get(&booking.slot_id) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let Some(new_slot) = state.slots.get(&request.new_slot_id) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    if domain::validate_reschedule(&old_slot, &new_slot, Utc::now()).is_err() {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    match state.bookings.reschedule(&id, &new_slot.id) {
+        Ok(updated) => Json(updated).into_response(),
+        Err(RescheduleError::NewSlotTaken) => StatusCode::CONFLICT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 #[cfg(test)]

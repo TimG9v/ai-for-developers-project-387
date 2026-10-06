@@ -44,7 +44,7 @@
             "description": "Невалидный ввод: обязательные поля пусты или значения вне допустимых границ."
           },
           "404": {
-            "description": "Слот или тип встречи не найдены."
+            "description": "Запись, слот или тип встречи не найдены."
           },
           "409": {
             "description": "Слот уже занят: на слот не может быть более одной записи."
@@ -56,6 +56,77 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/Booking"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/{id}": {
+      "delete": {
+        "operationId": "Bookings_cancel",
+        "description": "Отмена записи: слот освобождается и снова появляется в календаре.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "There is no content to send for this request, but the headers may be useful. "
+          },
+          "404": {
+            "description": "Запись, слот или тип встречи не найдены."
+          }
+        }
+      }
+    },
+    "/bookings/{id}/reschedule": {
+      "post": {
+        "operationId": "Bookings_reschedule",
+        "description": "Перенос записи на другой свободный слот того же типа встречи.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Невалидный ввод: обязательные поля пусты или значения вне допустимых границ."
+          },
+          "404": {
+            "description": "Запись, слот или тип встречи не найдены."
+          },
+          "409": {
+            "description": "Слот уже занят: на слот не может быть более одной записи."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleRequest"
               }
             }
           }
@@ -160,7 +231,7 @@
             "description": "Невалидный ввод: обязательные поля пусты или значения вне допустимых границ."
           },
           "404": {
-            "description": "Слот или тип встречи не найдены."
+            "description": "Запись, слот или тип встречи не найдены."
           }
         },
         "requestBody": {
@@ -255,6 +326,19 @@
           }
         },
         "description": "Тип встречи: разновидность встречи, которую задаёт владелец (название, описание, длительность)."
+      },
+      "RescheduleRequest": {
+        "type": "object",
+        "required": [
+          "newSlotId"
+        ],
+        "properties": {
+          "newSlotId": {
+            "type": "string",
+            "description": "Новый слот — свободный, того же типа встречи"
+          }
+        },
+        "description": "Запрос переноса записи: новый свободный слот того же типа встречи."
       },
       "Slot": {
         "type": "object",
