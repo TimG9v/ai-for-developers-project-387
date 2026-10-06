@@ -27,8 +27,8 @@ export function BookingForm({
   onRejected,
 }: {
   slot: Slot;
-  /** Успех: родитель показывает подтверждение и обновляет календарь. */
-  onBooked: (guestEmail: string) => void;
+  /** Успех: родитель показывает подтверждение со ссылкой управления записью. */
+  onBooked: (bookingId: string, guestEmail: string) => void;
   /** Отказ сервера: родитель показывает сообщение и обновляет календарь. */
   onRejected: (status: number | undefined) => void;
 }) {
@@ -48,9 +48,11 @@ export function BookingForm({
       return;
     }
 
+    // id записи генерирует клиент — он же токен ссылки управления записью.
+    const bookingId = crypto.randomUUID();
     const { error: createError } = await bookingsCreate({
       body: {
-        id: crypto.randomUUID(),
+        id: bookingId,
         slotId: slot.id,
         guestName,
         guestEmail,
@@ -64,7 +66,7 @@ export function BookingForm({
 
     // Подтверждение рендерит родитель: после перезагрузки календаря
     // выбранный слот уходит, форма размонтируется.
-    onBooked(guestEmail);
+    onBooked(bookingId, guestEmail);
   }
 
   return (

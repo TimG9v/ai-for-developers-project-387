@@ -29,6 +29,7 @@ export function BookingEventTypes({
     title: string;
     interval: string;
     email: string;
+    manageUrl: string;
   } | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
 
@@ -73,7 +74,7 @@ export function BookingEventTypes({
   );
 
   const handleBooked = useCallback(
-    (guestEmail: string) => {
+    (bookingId: string, guestEmail: string) => {
       setBookingError(null);
       const slot = slots.find((item) => item.id === selectedSlotId);
       if (slot) {
@@ -84,6 +85,9 @@ export function BookingEventTypes({
             new Date(slot.endDateTime),
           ),
           email: guestEmail,
+          // id записи — фактически unguessable-токен (ADR 0002): гость
+          // отменяет и переносит запись по ссылке без авторизации.
+          manageUrl: `/booking/manage?id=${bookingId}`,
         });
       }
       void refreshCalendar();
@@ -180,6 +184,18 @@ export function BookingEventTypes({
           <p className="text-muted-foreground">{confirmation.interval}</p>
           <p className="text-sm text-muted-foreground">
             Данные записи: {confirmation.email}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Отменить или перенести запись можно по ссылке управления:{" "}
+            <a
+              href={confirmation.manageUrl}
+              className="text-primary underline"
+              aria-label="Ссылка управления записью"
+            >
+              управление записью
+            </a>
+            . Сохраните её — без авторизации это единственный способ найти
+            вашу запись.
           </p>
         </div>
       )}

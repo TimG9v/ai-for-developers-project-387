@@ -84,6 +84,13 @@ describe("booking form", () => {
     await waitFor(() => {
       expect(screen.getByText(/Вы записаны/)).toBeTruthy();
     });
+    // Ссылка управления записью ведёт на /booking/manage?id=<id записи>.
+    await waitFor(() => {
+      const manageLink = screen.getByRole("link", {
+        name: "Ссылка управления записью",
+      });
+      expect(manageLink.getAttribute("href")).toBe(`/booking/manage?id=${body.id}`);
+    });
     // Занятый слот больше не выбирается в календаре.
     await waitFor(() => {
       expect(

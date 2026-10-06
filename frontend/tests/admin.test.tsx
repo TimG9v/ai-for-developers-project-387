@@ -5,6 +5,11 @@ vi.mock("@/src/client", () => ({
   eventTypesList: vi.fn(async () => ({ data: [] })),
   slotsList: vi.fn(async () => ({ data: [] })),
   upcomingMeetingsList: vi.fn(async () => ({ data: [] })),
+  bookingsCancel: vi.fn(async () => ({ data: undefined })),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 
 import Page from "@/app/admin/page";

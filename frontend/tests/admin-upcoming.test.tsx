@@ -1,21 +1,25 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const upcomingMeetingsList = vi.fn();
+const bookingsCancel = vi.fn();
+const routerRefresh = vi.fn();
 
 vi.mock("@/src/client", () => ({
   upcomingMeetingsList: (...args: unknown[]) => upcomingMeetingsList(...args),
   eventTypesList: vi.fn(async () => ({ data: [] })),
+  bookingsCancel: (...args: unknown[]) => bookingsCancel(...args),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: routerRefresh }),
 }));
 
 import Page from "@/app/admin/page";
 
 const slotStart = new Date(2026, 10, 15, 10, 0);
 const slotEnd = new Date(2026, 10, 15, 10, 30);
-const pastStart = new Date(2025, 0, 1, 10, 0);
-const pastEnd = new Date(2025, 0, 1, 10, 30);
 
-const EVENT_TYPES = [{ id: "et1", title: "Созвон", durationMinutes: 30 }];
 const MEETING = {
   id: "b1",
   slotId: "s1",
@@ -47,5 +51,33 @@ describe("admin page lists upcoming meetings", () => {
     render(await Page());
 
     expect(screen.getByText("Пока нет записей")).toBeTruthy();
+  });
+
+  it("lets the owner cancel a booking from the meeting card", async () => {
+    upcomingMeetingsList.mockResolvedValueOnce({ data: [MEETING] });
+    bookingsCancel.mockResolvedValueOnce({ data: undefined });
+
+    render(await Page());
+    fireEvent.click(screen.getByRole("button", { name: "Отменить запись b1" }));
+
+    await waitFor(() => {
+      expect(bookingsCancel).toHaveBeenCalledWith({ path: { id: "b1" } });
+    });
+    await waitFor(() => {
+      expect(routerRefresh).toHaveBeenCalled();
+    });
+  });
+
+  it("explains a failed cancellation instead of breaking", async () => {
+    upcomingMeetingsList.mockResolvedValueOnce({ data: [MEETING] });
+    bookingsCancel.mockResolvedValueOnce({ data: undefined, error: { status: 500 } });
+
+    render(await Page());
+    fireEvent.click(screen.getByRole("button", { name: "Отменить запись b1" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toContain("Не удалось отменить");
+    });
+    expect(routerRefresh).not.toHaveBeenCalled();
   });
 });

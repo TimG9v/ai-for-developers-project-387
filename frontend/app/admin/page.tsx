@@ -4,6 +4,7 @@ import {
   type UpcomingMeeting,
 } from "@/src/client";
 
+import { AdminCancelBooking } from "@/components/admin-cancel-booking";
 import { AdminEventTypes } from "@/components/admin-event-types";
 import { AdminSlots } from "@/components/admin-slots";
 import { formatSlotInterval } from "@/lib/slot-time";
@@ -53,13 +54,14 @@ export default async function AdminPage() {
             {meetings.map((meeting) => (
               <li
                 key={meeting.key}
-                className="rounded-xl border bg-card p-6 text-card-foreground"
+                className="flex flex-col gap-2 rounded-xl border bg-card p-6 text-card-foreground"
               >
                 <p className="font-medium">{meeting.guestName}</p>
                 <p className="text-muted-foreground">{meeting.guestEmail}</p>
                 <p className="text-sm text-muted-foreground">
                   {meeting.eventTitle} · {meeting.interval}
                 </p>
+                <AdminCancelBooking bookingId={meeting.key} />
               </li>
             ))}
           </ul>
