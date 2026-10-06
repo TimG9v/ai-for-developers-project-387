@@ -7,7 +7,7 @@ mod common;
 use std::sync::Arc;
 
 use backend::api::api_types::{Booking, EventType, Slot};
-use backend::domain::{BookingsRepository, EventTypesRepository, SlotsRepository};
+use backend::domain::{BookingsRepository, EventTypesRepository, RescheduleError, SlotsRepository};
 use backend::infra::{InMemoryBookings, InMemoryEventTypes, InMemorySlots};
 use chrono::{Duration, Utc};
 
@@ -29,8 +29,9 @@ fn slot(id: &str, event_type_id: &str, start: chrono::DateTime<Utc>, minutes: i6
     }
 }
 
-/// Типы et1 (30 мин) и et2 (60 мин); свободные слоты s1 и s2 на завтра;
-/// слот s-out на 15-й день (вне окна) — сеян напрямую мимо валидации.
+/// Типы et1 (30 мин) и et2 (60 мин); свободные слоты s1 и s3 (оба et1) и
+/// s2 (et2) на завтра; слот s-out на 15-й день (вне окна) — сеян напрямую
+/// мимо валидации. Два слота одного типа — для сценариев переноса.
 fn seeded_state() -> backend::AppState {
     let event_types = InMemoryEventTypes::new();
     event_types.add(event_type("et1", 30));
@@ -39,6 +40,7 @@ fn seeded_state() -> backend::AppState {
     let start = Utc::now() + Duration::days(1);
     slots.add(slot("s1", "et1", start, 30));
     slots.add(slot("s2", "et2", start, 60));
+    slots.add(slot("s3", "et1", start + Duration::hours(2), 30));
     slots.add(slot("s-out", "et1", start + Duration::days(14), 30));
     backend::AppState {
         event_types: Arc::new(event_types),
@@ -248,4 +250,223 @@ async fn bookings_list_on_empty_storage_returns_empty_array() {
 
     assert!(raw.contains("HTTP/1.1 200"), "got: {raw}");
     assert_eq!(common::response_body(&raw).trim(), "[]");
+}
+
+async fn seed_booking(app: &axum::Router, id: &str, slot_id: &str) {
+    let raw = common::send(
+        app.clone(),
+        &common::post_request(
+            "/bookings",
+            &booking_body(id, slot_id, "Гость", "g@example.com"),
+        ),
+    )
+    .await;
+    assert!(raw.contains("HTTP/1.1 200"), "seed {id}: got: {raw}");
+}
+
+fn calendar_slot_ids(raw: &str) -> Vec<String> {
+    let items: serde_json::Value =
+        serde_json::from_str(common::response_body(raw)).expect("JSON-тело");
+    items
+        .as_array()
+        .expect("Slot[]")
+        .iter()
+        .map(|slot| slot["id"].as_str().expect("id").to_string())
+        .collect()
+}
+
+#[tokio::test]
+async fn bookings_cancel_returns_204_and_frees_the_slot() {
+    let app = backend::app_with_state(seeded_state());
+    seed_booking(&app, "b1", "s1").await;
+
+    let raw = common::send(app.clone(), &common::delete_request("/bookings/b1")).await;
+    assert!(raw.contains("HTTP/1.1 204"), "got: {raw}");
+    assert_eq!(common::response_body(&raw).trim(), "");
+
+    // Отменённый слот снова виден в календаре записи (история 7).
+    let raw = common::send(app.clone(), &common::get_request("/slots?eventTypeId=et1")).await;
+    assert!(
+        calendar_slot_ids(&raw).contains(&"s1".to_string()),
+        "слот должен освободиться: {raw}"
+    );
+
+    // Повторная отмена той же записи — записи больше нет.
+    let raw = common::send(app, &common::delete_request("/bookings/b1")).await;
+    assert!(raw.contains("HTTP/1.1 404"), "got: {raw}");
+}
+
+#[tokio::test]
+async fn bookings_cancel_unknown_booking_returns_404() {
+    let app = backend::app_with_state(seeded_state());
+
+    let raw = common::send(app, &common::delete_request("/bookings/nope")).await;
+
+    assert!(raw.contains("HTTP/1.1 404"), "got: {raw}");
+}
+
+#[tokio::test]
+async fn bookings_reschedule_moves_booking_to_new_slot_of_same_type() {
+    let app = backend::app_with_state(seeded_state());
+    seed_booking(&app, "b1", "s1").await;
+
+    let raw = common::send(
+        app.clone(),
+        &common::post_request("/bookings/b1/reschedule", r#"{"newSlotId":"s3"}"#),
+    )
+    .await;
+
+    assert!(raw.contains("HTTP/1.1 200"), "got: {raw}");
+    let updated: serde_json::Value =
+        serde_json::from_str(common::response_body(&raw)).expect("JSON-тело");
+    assert_eq!(updated["slotId"], "s3");
+    assert_eq!(updated["guestName"], "Гость");
+
+    // Старый слот освободился, новый занят.
+    let raw = common::send(app.clone(), &common::get_request("/slots?eventTypeId=et1")).await;
+    let ids = calendar_slot_ids(&raw);
+    assert!(
+        ids.contains(&"s1".to_string()),
+        "старый слот свободен: {ids:?}"
+    );
+    assert!(
+        !ids.contains(&"s3".to_string()),
+        "новый слот занят: {ids:?}"
+    );
+}
+
+#[tokio::test]
+async fn bookings_reschedule_to_taken_slot_returns_409() {
+    let app = backend::app_with_state(seeded_state());
+    seed_booking(&app, "b1", "s1").await;
+    seed_booking(&app, "b2", "s3").await;
+
+    let raw = common::send(
+        app,
+        &common::post_request("/bookings/b1/reschedule", r#"{"newSlotId":"s3"}"#),
+    )
+    .await;
+
+    assert!(raw.contains("HTTP/1.1 409"), "got: {raw}");
+}
+
+#[tokio::test]
+async fn bookings_reschedule_to_other_event_type_returns_400() {
+    let app = backend::app_with_state(seeded_state());
+    seed_booking(&app, "b1", "s1").await;
+
+    // s2 — слот типа et2, запись оформлена на et1.
+    let raw = common::send(
+        app,
+        &common::post_request("/bookings/b1/reschedule", r#"{"newSlotId":"s2"}"#),
+    )
+    .await;
+
+    assert!(raw.contains("HTTP/1.1 400"), "got: {raw}");
+}
+
+#[tokio::test]
+async fn bookings_reschedule_to_slot_outside_window_returns_400() {
+    let app = backend::app_with_state(seeded_state());
+    seed_booking(&app, "b1", "s1").await;
+
+    // История 16: окно едино для всех — перенос на слот вне окна отклоняется.
+    let raw = common::send(
+        app,
+        &common::post_request("/bookings/b1/reschedule", r#"{"newSlotId":"s-out"}"#),
+    )
+    .await;
+
+    assert!(raw.contains("HTTP/1.1 400"), "got: {raw}");
+}
+
+#[tokio::test]
+async fn bookings_reschedule_rejects_unknown_booking_and_unknown_slot_with_404() {
+    let app = backend::app_with_state(seeded_state());
+
+    let raw = common::send(
+        app.clone(),
+        &common::post_request("/bookings/nope/reschedule", r#"{"newSlotId":"s3"}"#),
+    )
+    .await;
+    assert!(raw.contains("HTTP/1.1 404"), "нет записи: got: {raw}");
+
+    seed_booking(&app, "b1", "s1").await;
+    let raw = common::send(
+        app,
+        &common::post_request("/bookings/b1/reschedule", r#"{"newSlotId":"nope"}"#),
+    )
+    .await;
+    assert!(raw.contains("HTTP/1.1 404"), "нет слота: got: {raw}");
+}
+
+#[tokio::test]
+async fn bookings_reschedule_rejects_invalid_body_with_400() {
+    let app = backend::app_with_state(seeded_state());
+    seed_booking(&app, "b1", "s1").await;
+
+    let invalid_bodies = [
+        // пустое тело без newSlotId
+        "{}".to_string(),
+        // вовсе не JSON
+        "not json".to_string(),
+    ];
+    for body in invalid_bodies {
+        let raw = common::send(
+            app.clone(),
+            &common::post_request("/bookings/b1/reschedule", &body),
+        )
+        .await;
+        assert!(
+            raw.contains("HTTP/1.1 400"),
+            "тело {body} должно отклоняться 400, got: {raw}"
+        );
+    }
+}
+
+#[test]
+fn in_memory_bookings_remove_removes_exactly_once() {
+    let bookings = InMemoryBookings::new();
+    bookings.try_add(Booking {
+        id: "b1".to_string(),
+        slot_id: "s1".to_string(),
+        guest_name: "Гость".to_string(),
+        guest_email: "g@example.com".to_string(),
+        created_at: Utc::now(),
+    });
+
+    assert!(bookings.remove("b1"));
+    assert!(!bookings.remove("b1"));
+    assert!(!bookings.contains_slot("s1"), "слот освободился");
+}
+
+#[test]
+fn in_memory_bookings_reschedule_rejects_taken_target_without_changes() {
+    // Атомарность переноса: занятый целевой слот — отказ, запись на месте.
+    let bookings = InMemoryBookings::new();
+    for (id, slot_id) in [("b1", "s1"), ("b2", "s2")] {
+        bookings.try_add(Booking {
+            id: id.to_string(),
+            slot_id: slot_id.to_string(),
+            guest_name: "Гость".to_string(),
+            guest_email: "g@example.com".to_string(),
+            created_at: Utc::now(),
+        });
+    }
+
+    assert!(matches!(
+        bookings.reschedule("b1", "s2"),
+        Err(RescheduleError::NewSlotTaken)
+    ));
+    assert!(bookings.contains_slot("s1"), "запись не сдвинулась");
+    assert!(matches!(
+        bookings.reschedule("nope", "s3"),
+        Err(RescheduleError::BookingNotFound)
+    ));
+
+    let moved = bookings
+        .reschedule("b1", "s3")
+        .expect("перенос на свободный слот");
+    assert_eq!(moved.slot_id, "s3");
+    assert!(!bookings.contains_slot("s1"), "старый слот освободился");
 }
