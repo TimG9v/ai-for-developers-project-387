@@ -38,6 +38,16 @@ export type EventType = {
 };
 
 /**
+ * Запрос переноса записи: новый свободный слот того же типа встречи.
+ */
+export type RescheduleRequest = {
+    /**
+     * Новый слот — свободный, того же типа встречи
+     */
+    newSlotId: string;
+};
+
+/**
  * Слот: свободный интервал, опубликованный владельцем; длительность определяется типом встречи.
  */
 export type Slot = {
@@ -93,7 +103,7 @@ export type BookingsCreateErrors = {
      */
     400: unknown;
     /**
-     * Слот или тип встречи не найдены.
+     * Запись, слот или тип встречи не найдены.
      */
     404: unknown;
     /**
@@ -110,6 +120,64 @@ export type BookingsCreateResponses = {
 };
 
 export type BookingsCreateResponse = BookingsCreateResponses[keyof BookingsCreateResponses];
+
+export type BookingsCancelData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/bookings/{id}';
+};
+
+export type BookingsCancelErrors = {
+    /**
+     * Запись, слот или тип встречи не найдены.
+     */
+    404: unknown;
+};
+
+export type BookingsCancelResponses = {
+    /**
+     * There is no content to send for this request, but the headers may be useful.
+     */
+    204: void;
+};
+
+export type BookingsCancelResponse = BookingsCancelResponses[keyof BookingsCancelResponses];
+
+export type BookingsRescheduleData = {
+    body: RescheduleRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/bookings/{id}/reschedule';
+};
+
+export type BookingsRescheduleErrors = {
+    /**
+     * Невалидный ввод: обязательные поля пусты или значения вне допустимых границ.
+     */
+    400: unknown;
+    /**
+     * Запись, слот или тип встречи не найдены.
+     */
+    404: unknown;
+    /**
+     * Слот уже занят: на слот не может быть более одной записи.
+     */
+    409: unknown;
+};
+
+export type BookingsRescheduleResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: Booking;
+};
+
+export type BookingsRescheduleResponse = BookingsRescheduleResponses[keyof BookingsRescheduleResponses];
 
 export type EventTypesListData = {
     body?: never;
@@ -181,7 +249,7 @@ export type SlotsCreateErrors = {
      */
     400: unknown;
     /**
-     * Слот или тип встречи не найдены.
+     * Запись, слот или тип встречи не найдены.
      */
     404: unknown;
 };
