@@ -34,6 +34,12 @@ function fillSlotForm({
 }
 
 describe("admin page publishes slots", () => {
+  it("предлагает 30-минутную сетку в поле времени", () => {
+    render(<AdminSlots eventTypes={EVENT_TYPES} />);
+
+    expect(screen.getByLabelText("Время").getAttribute("step")).toBe("1800");
+  });
+
   it("creates a slot with interval duration from the chosen type", async () => {
     slotsCreate.mockResolvedValueOnce({
       data: {

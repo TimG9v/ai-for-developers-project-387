@@ -96,6 +96,7 @@ export function AdminSlots({ eventTypes }: { eventTypes: EventType[] }) {
         <input
           id="slot-time"
           type="time"
+          step={1800}
           value={time}
           onChange={(changeEvent) => setTime(changeEvent.target.value)}
           className="rounded-lg border bg-background px-3 py-2"
