@@ -7,6 +7,3 @@ dist/
 *.tsbuildinfo
 .env*.local
 tmp*
-
-# локальная конфигурация OpenCode этого проекта
-opencode.json

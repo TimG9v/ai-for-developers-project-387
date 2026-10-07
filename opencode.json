@@ -1,0 +1,30 @@
+{
+  "mcp": {
+    "servers": {
+      "render": {
+        "type": "remote",
+        "url": "https://mcp.render.com/mcp",
+        "oauth": false,
+        "headers": {
+          "Authorization": "Bearer {env:RENDER_API_KEY}"
+        }
+      },
+      "playwright": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "@playwright/mcp@0.0.83"
+        ]
+      },
+      "chrome-devtools": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "chrome-devtools-mcp@1.10.1"
+        ]
+      }
+    }
+  }
+}

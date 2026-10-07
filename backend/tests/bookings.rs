@@ -1,6 +1,7 @@
-//! HTTP-шов: запись гостя на слот. Атомарность слота (одна Запись на Слот),
-//! конфликты 409, несуществующий слот 404, обязательность гостя 400,
-//! единое окно 14 дней. Занятые слоты исчезают из календаря.
+//! HTTP-шов: запись гостя на слот. Атомарность интервала (записи не
+//! пересекаются по времени, ADR 0004), конфликты 409, несуществующий слот
+//! 404, обязательность гостя 400, единое окно 14 дней. Слоты, занятые по
+//! времени, исчезают из календаря.
 
 mod common;
 
@@ -29,17 +30,21 @@ fn slot(id: &str, event_type_id: &str, start: chrono::DateTime<Utc>, minutes: i6
     }
 }
 
-/// Типы et1 (30 мин) и et2 (60 мин); свободные слоты s1 и s3 (оба et1) и
-/// s2 (et2) на завтра; слот s-out на 15-й день (вне окна) — сеян напрямую
-/// мимо валидации. Два слота одного типа — для сценариев переноса.
+/// Типы et1 (30 мин) и et2 (60 мин); свободные слоты s1 и s3 (оба et1),
+/// s2 (et2, то же начало, что s1 — пересечение) и s4 (et2, стык с s1)
+/// на завтра; слот s-out на 15-й день (вне окна) — сеян напрямую мимо
+/// валидации. Два слота одного типа — для сценариев переноса.
 fn seeded_state() -> backend::AppState {
     let event_types = InMemoryEventTypes::new();
     event_types.add(event_type("et1", 30));
     event_types.add(event_type("et2", 60));
     let slots = InMemorySlots::new();
-    let start = Utc::now() + Duration::days(1);
+    // Начало на 30-минутной сетке: seeded-слоты участвуют и в переносах,
+    // где сетку проверяет validate_reschedule.
+    let start = common::floor_grid(Utc::now() + Duration::days(1));
     slots.add(slot("s1", "et1", start, 30));
     slots.add(slot("s2", "et2", start, 60));
+    slots.add(slot("s4", "et2", start + Duration::minutes(30), 60));
     slots.add(slot("s3", "et1", start + Duration::hours(2), 30));
     slots.add(slot("s-out", "et1", start + Duration::days(14), 30));
     backend::AppState {
@@ -96,41 +101,84 @@ async fn bookings_create_returns_created_booking_and_slot_leaves_calendar() {
 async fn bookings_create_second_booking_on_same_slot_returns_409() {
     let app = backend::app_with_state(seeded_state());
 
-    // 409 независимо от типа встречи: проверяем на двух типах.
-    for slot_id in ["s1", "s2"] {
-        let first = common::send(
-            app.clone(),
-            &common::post_request(
-                "/bookings",
-                &booking_body(
-                    &format!("b-first-{slot_id}"),
-                    slot_id,
-                    "Первый",
-                    "first@example.com",
-                ),
-            ),
-        )
-        .await;
-        assert!(first.contains("HTTP/1.1 200"), "{slot_id}: got: {first}");
+    seed_booking(&app, "b-first-s1", "s1").await;
 
-        let second = common::send(
-            app.clone(),
-            &common::post_request(
-                "/bookings",
-                &booking_body(
-                    &format!("b-second-{slot_id}"),
-                    slot_id,
-                    "Второй",
-                    "second@example.com",
-                ),
-            ),
-        )
-        .await;
-        assert!(
-            second.contains("HTTP/1.1 409"),
-            "повторная запись на {slot_id} должна быть 409, got: {second}"
-        );
-    }
+    let second = common::send(
+        app,
+        &common::post_request(
+            "/bookings",
+            &booking_body("b-second-s1", "s1", "Второй", "second@example.com"),
+        ),
+    )
+    .await;
+    assert!(
+        second.contains("HTTP/1.1 409"),
+        "повторная запись на s1 должна быть 409, got: {second}"
+    );
+    // Пересечение слотов разных типов — отдельный тест (ADR 0004).
+}
+
+#[tokio::test]
+async fn slots_list_hides_slots_overlapping_booked_interval() {
+    // ADR 0004 в read-пути: календарь не предлагает слоты, чей интервал
+    // пересекается с занятым, — даже слоты других типов; стык остаётся видим.
+    let app = backend::app_with_state(seeded_state());
+    seed_booking(&app, "b1", "s1").await; // et1: start..start+30
+
+    let raw = common::send(app, &common::get_request("/slots?eventTypeId=et2")).await;
+    let items: serde_json::Value =
+        serde_json::from_str(common::response_body(&raw)).expect("JSON-тело");
+    let ids: Vec<&str> = items
+        .as_array()
+        .expect("Slot[]")
+        .iter()
+        .map(|slot| slot["id"].as_str().expect("id"))
+        .collect();
+    assert!(
+        !ids.contains(&"s2"),
+        "пересекающийся с бронью слот скрыт из календаря: {items}"
+    );
+    assert!(
+        ids.contains(&"s4"),
+        "слот, стыкующийся с бронью, доступен: {items}"
+    );
+}
+
+#[tokio::test]
+async fn bookings_create_on_overlapping_slot_of_other_event_type_returns_409() {
+    // ADR 0004: занятость времени не зависит от типа встречи — слот другого
+    // типа с пересекающимся интервалом отклоняется 409.
+    let app = backend::app_with_state(seeded_state());
+
+    seed_booking(&app, "b1", "s1").await; // et1: start..start+30
+
+    // s2 (et2) стартует одновременно с s1 и длится 60 мин — пересечение.
+    let raw = common::send(
+        app,
+        &common::post_request(
+            "/bookings",
+            &booking_body("b2", "s2", "Второй", "second@example.com"),
+        ),
+    )
+    .await;
+    assert!(
+        raw.contains("HTTP/1.1 409"),
+        "пересечение интервалов: {raw}"
+    );
+}
+
+#[tokio::test]
+async fn bookings_create_on_touching_slot_returns_200() {
+    // Стык слотов (начало следующего == конец занятого) — не конфликт.
+    let app = backend::app_with_state(seeded_state());
+
+    seed_booking(&app, "b1", "s1").await; // start..start+30
+    seed_booking(&app, "b2", "s4").await; // s4: start+30..start+90 (et2)
+
+    let raw = common::send(app, &common::get_request("/bookings")).await;
+    let items: serde_json::Value =
+        serde_json::from_str(common::response_body(&raw)).expect("JSON-тело");
+    assert_eq!(items.as_array().expect("Booking[]").len(), 2);
 }
 
 #[tokio::test]
@@ -194,38 +242,54 @@ async fn bookings_create_rejects_slot_outside_window_with_400() {
 
 #[test]
 fn in_memory_bookings_try_add_is_insert_if_absent() {
-    // Атомарность слота: проверка занятости и вставка — единая операция.
+    // Атомарность интервала: вставка не создаёт пересекающихся записей.
     let bookings = InMemoryBookings::new();
-    let booking = Booking {
-        id: "b1".to_string(),
-        slot_id: "s1".to_string(),
+    let start = Utc::now() + Duration::days(1);
+    let booking = |id: &str, slot_id: &str| Booking {
+        id: id.to_string(),
+        slot_id: slot_id.to_string(),
         guest_name: "Гость".to_string(),
         guest_email: "g@example.com".to_string(),
         created_at: Utc::now(),
     };
 
-    assert!(bookings.try_add(booking.clone()));
-    assert!(!bookings.try_add(booking));
+    let s1 = slot("s1", "et1", start, 30);
+    assert!(bookings.try_add(booking("b1", "s1"), &s1));
+    // тот же слот — тот же интервал
+    assert!(!bookings.try_add(booking("b2", "s1"), &s1));
+    // другой тип, начало внутри занятого интервала — пересечение
+    let s2 = slot("s2", "et2", start + Duration::minutes(15), 30);
+    assert!(!bookings.try_add(booking("b3", "s2"), &s2));
+    // стык с занятым слотом — не пересечение
+    let s3 = slot("s3", "et1", start + Duration::minutes(30), 30);
+    assert!(bookings.try_add(booking("b4", "s3"), &s3));
 }
 
 #[tokio::test]
 async fn bookings_list_returns_bookings_of_all_types() {
     // Ракурс владельца: записи на слоты разных типов — в одном списке.
     let state = seeded_state();
-    state.bookings.try_add(Booking {
-        id: "b1".to_string(),
-        slot_id: "s1".to_string(),
-        guest_name: "Первый".to_string(),
-        guest_email: "first@example.com".to_string(),
-        created_at: Utc::now(),
-    });
-    state.bookings.try_add(Booking {
-        id: "b2".to_string(),
-        slot_id: "s2".to_string(),
-        guest_name: "Второй".to_string(),
-        guest_email: "second@example.com".to_string(),
-        created_at: Utc::now(),
-    });
+    let start = Utc::now() + Duration::days(1);
+    assert!(state.bookings.try_add(
+        Booking {
+            id: "b1".to_string(),
+            slot_id: "s1".to_string(),
+            guest_name: "Первый".to_string(),
+            guest_email: "first@example.com".to_string(),
+            created_at: Utc::now(),
+        },
+        &slot("s1", "et1", start, 30),
+    ));
+    assert!(state.bookings.try_add(
+        Booking {
+            id: "b2".to_string(),
+            slot_id: "s4".to_string(),
+            guest_name: "Второй".to_string(),
+            guest_email: "second@example.com".to_string(),
+            created_at: Utc::now(),
+        },
+        &slot("s4", "et2", start + Duration::minutes(30), 60),
+    ));
     let app = backend::app_with_state(state);
 
     let raw = common::send(app, &common::get_request("/bookings")).await;
@@ -239,7 +303,7 @@ async fn bookings_list_returns_bookings_of_all_types() {
         .iter()
         .map(|booking| booking["slotId"].as_str().expect("slotId"))
         .collect();
-    assert_eq!(slot_ids, vec!["s1", "s2"], "записи всех типов: {items:?}");
+    assert_eq!(slot_ids, vec!["s1", "s4"], "записи всех типов: {items:?}");
     assert_eq!(items[0]["guestName"], "Первый");
     assert_eq!(items[1]["guestEmail"], "second@example.com");
 }
@@ -381,6 +445,29 @@ async fn bookings_reschedule_to_slot_outside_window_returns_400() {
 }
 
 #[tokio::test]
+async fn bookings_reschedule_to_off_grid_slot_returns_400() {
+    let state = seeded_state();
+    // et1, начало через день + 17 минут от сетки — вне 30-минутной сетки;
+    // сеян напрямую, поэтому сетку ловит только validate_reschedule.
+    let base = common::floor_grid(Utc::now() + Duration::days(1));
+    state
+        .slots
+        .add(slot("s-off-grid", "et1", base + Duration::minutes(17), 30));
+    let app = backend::app_with_state(state);
+    seed_booking(&app, "b1", "s1").await;
+
+    let raw = common::send(
+        app,
+        &common::post_request("/bookings/b1/reschedule", r#"{"newSlotId":"s-off-grid"}"#),
+    )
+    .await;
+    assert!(
+        raw.contains("HTTP/1.1 400"),
+        "вне сетки — 400, не 404: {raw}"
+    );
+}
+
+#[tokio::test]
 async fn bookings_reschedule_rejects_unknown_booking_and_unknown_slot_with_404() {
     let app = backend::app_with_state(seeded_state());
 
@@ -427,13 +514,17 @@ async fn bookings_reschedule_rejects_invalid_body_with_400() {
 #[test]
 fn in_memory_bookings_remove_removes_exactly_once() {
     let bookings = InMemoryBookings::new();
-    bookings.try_add(Booking {
-        id: "b1".to_string(),
-        slot_id: "s1".to_string(),
-        guest_name: "Гость".to_string(),
-        guest_email: "g@example.com".to_string(),
-        created_at: Utc::now(),
-    });
+    let start = Utc::now() + Duration::days(1);
+    bookings.try_add(
+        Booking {
+            id: "b1".to_string(),
+            slot_id: "s1".to_string(),
+            guest_name: "Гость".to_string(),
+            guest_email: "g@example.com".to_string(),
+            created_at: Utc::now(),
+        },
+        &slot("s1", "et1", start, 30),
+    );
 
     assert!(bookings.remove("b1"));
     assert!(!bookings.remove("b1"));
@@ -442,30 +533,38 @@ fn in_memory_bookings_remove_removes_exactly_once() {
 
 #[test]
 fn in_memory_bookings_reschedule_rejects_taken_target_without_changes() {
-    // Атомарность переноса: занятый целевой слот — отказ, запись на месте.
+    // Атомарность переноса: занятый целевой интервал — отказ, запись на месте.
     let bookings = InMemoryBookings::new();
-    for (id, slot_id) in [("b1", "s1"), ("b2", "s2")] {
-        bookings.try_add(Booking {
-            id: id.to_string(),
-            slot_id: slot_id.to_string(),
-            guest_name: "Гость".to_string(),
-            guest_email: "g@example.com".to_string(),
-            created_at: Utc::now(),
-        });
+    let start = Utc::now() + Duration::days(1);
+    // Соседние непересекающиеся слоты: s1 и s2 заняты, s3 — свободный.
+    let s1 = slot("s1", "et1", start, 30);
+    let s2 = slot("s2", "et1", start + Duration::minutes(30), 30);
+    let s3 = slot("s3", "et1", start + Duration::minutes(60), 30);
+    for (id, target) in [("b1", &s1), ("b2", &s2)] {
+        assert!(bookings.try_add(
+            Booking {
+                id: id.to_string(),
+                slot_id: target.id.clone(),
+                guest_name: "Гость".to_string(),
+                guest_email: "g@example.com".to_string(),
+                created_at: Utc::now(),
+            },
+            target,
+        ));
     }
 
     assert!(matches!(
-        bookings.reschedule("b1", "s2"),
+        bookings.reschedule("b1", &s2),
         Err(RescheduleError::NewSlotTaken)
     ));
     assert!(bookings.contains_slot("s1"), "запись не сдвинулась");
     assert!(matches!(
-        bookings.reschedule("nope", "s3"),
+        bookings.reschedule("nope", &s3),
         Err(RescheduleError::BookingNotFound)
     ));
 
     let moved = bookings
-        .reschedule("b1", "s3")
+        .reschedule("b1", &s3)
         .expect("перенос на свободный слот");
     assert_eq!(moved.slot_id, "s3");
     assert!(!bookings.contains_slot("s1"), "старый слот освободился");

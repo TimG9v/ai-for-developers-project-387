@@ -34,6 +34,12 @@ function fillSlotForm({
 }
 
 describe("admin page publishes slots", () => {
+  it("предлагает 30-минутную сетку в поле времени", () => {
+    render(<AdminSlots eventTypes={EVENT_TYPES} />);
+
+    expect(screen.getByLabelText("Время").getAttribute("step")).toBe("1800");
+  });
+
   it("creates a slot with interval duration from the chosen type", async () => {
     slotsCreate.mockResolvedValueOnce({
       data: {
@@ -90,5 +96,8 @@ describe("admin page publishes slots", () => {
     expect(screen.getByRole("alert").textContent).toContain(
       "Не удалось опубликовать слот",
     );
+    // 400 от сервера чаще всего про сетку/окно — подсказываем причину
+    // (ревью PR #15: форма молча показывала общий текст).
+    expect(screen.getByRole("alert").textContent).toContain("30 минутам");
   });
 });

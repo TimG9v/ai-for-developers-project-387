@@ -43,7 +43,9 @@ export function AdminSlots({ eventTypes }: { eventTypes: EventType[] }) {
       },
     });
     if (error !== undefined) {
-      setErrorMessage("Не удалось опубликовать слот: сервер отклонил данные");
+      setErrorMessage(
+        "Не удалось опубликовать слот: сервер отклонил данные. Время должно быть кратно 30 минутам (:00/:30), слот — в окне 14 дней",
+      );
       return;
     }
 
@@ -96,6 +98,7 @@ export function AdminSlots({ eventTypes }: { eventTypes: EventType[] }) {
         <input
           id="slot-time"
           type="time"
+          step={1800}
           value={time}
           onChange={(changeEvent) => setTime(changeEvent.target.value)}
           className="rounded-lg border bg-background px-3 py-2"

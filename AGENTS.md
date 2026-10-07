@@ -29,6 +29,7 @@
 ## Правила
 
 - Коммиты — Conventional Commits: `feat:`, `fix:`, `chore:`, `ci:`, `docs:` (scope допустим: `feat(backend):`). Формат касается и коммитов агента: release-please строит из истории коммитов changelog и semver-версию.
+- Коммит, реализующий тикет, ссылается на него в теле: `Refs #N`; PR закрывает тикет: `Closes #N`.
 - Frontend — Next.js 16, отличается от привычной версии: перед правкой фронтенда читай гайд в `frontend/node_modules/next/dist/docs/` (блок правил автогенерируется `next dev` в `frontend/AGENTS.md`).
 
 ## Agent skills
