@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.2.0...v0.3.0) (2026-10-07)
+
+
+### Features
+
+* **backend:** демо-данные in-memory при старте бинарника ([a0ac267](https://github.com/TimG9v/ai-for-developers-project-387/commit/a0ac2674c4315c1edc7dcb356bce0519b46e3b7e))
+
+
+### Bug Fixes
+
+* **backend:** атомарный 409 на пересечение интервалов записей ([c132971](https://github.com/TimG9v/ai-for-developers-project-387/commit/c13297105a239fa1ff63af1b56e362d57c7911d5))
+* **backend:** отклонять слоты вне 30-минутной сетки ([22e32bb](https://github.com/TimG9v/ai-for-developers-project-387/commit/22e32bb3f069963e769716d2e27efcd62e0d16eb))
+* **backend:** скрывать из календаря слоты, пересекающие занятые интервалы ([92a1fe9](https://github.com/TimG9v/ai-for-developers-project-387/commit/92a1fe91d2b93c96c848cf26eaf8361af85f8d86))
+* **frontend:** 30-минутная сетка в поле времени слота ([5c88362](https://github.com/TimG9v/ai-for-developers-project-387/commit/5c88362dfd4c493acbee8bb160ff53ea98738fe6))
+* **frontend:** подсказывать причину отказа при публикации слота ([79d31cc](https://github.com/TimG9v/ai-for-developers-project-387/commit/79d31cc5a611f0a11407d17195b670f0b9fb1022))
+
 ## [0.2.0](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.1.0...v0.2.0) (2026-10-06)
 
 
