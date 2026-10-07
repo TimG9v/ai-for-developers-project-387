@@ -14,8 +14,9 @@ jobs:
   review:
     runs-on: ubuntu-latest
     # Прогоны opencode периодически зависают молча; дефолт GitHub —
-    # 360 минут. Режем через 15: ревью либо успевает, либо отменяется.
-    timeout-minutes: 15
+    # 360 минут. Режем через 30: маленькие PR ревьювятся за 2–3 минуты,
+    # большие (PR #15) — около 10–15; 360 оставлять нельзя.
+    timeout-minutes: 30
     permissions:
       id-token: write
       contents: read
