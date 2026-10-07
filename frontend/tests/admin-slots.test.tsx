@@ -100,4 +100,19 @@ describe("admin page publishes slots", () => {
     // (ревью PR #15: форма молча показывала общий текст).
     expect(screen.getByRole("alert").textContent).toContain("30 минутам");
   });
+
+  it("names the duplicate on 409 instead of a silent double", async () => {
+    slotsCreate.mockResolvedValueOnce({ data: undefined, error: { status: 409 } });
+
+    render(<AdminSlots eventTypes={EVENT_TYPES} />);
+    fillSlotForm();
+    fireEvent.click(screen.getByRole("button", { name: "Опубликовать слот" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Слот на это время уже опубликован",
+    );
+  });
 });

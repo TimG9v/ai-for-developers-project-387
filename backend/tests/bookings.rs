@@ -36,17 +36,17 @@ fn slot(id: &str, event_type_id: &str, start: chrono::DateTime<Utc>, minutes: i6
 /// валидации. Два слота одного типа — для сценариев переноса.
 fn seeded_state() -> backend::AppState {
     let event_types = InMemoryEventTypes::new();
-    event_types.add(event_type("et1", 30));
-    event_types.add(event_type("et2", 60));
+    event_types.try_add(event_type("et1", 30));
+    event_types.try_add(event_type("et2", 60));
     let slots = InMemorySlots::new();
     // Начало на 30-минутной сетке: seeded-слоты участвуют и в переносах,
     // где сетку проверяет validate_reschedule.
     let start = common::floor_grid(Utc::now() + Duration::days(1));
-    slots.add(slot("s1", "et1", start, 30));
-    slots.add(slot("s2", "et2", start, 60));
-    slots.add(slot("s4", "et2", start + Duration::minutes(30), 60));
-    slots.add(slot("s3", "et1", start + Duration::hours(2), 30));
-    slots.add(slot("s-out", "et1", start + Duration::days(14), 30));
+    slots.try_add(slot("s1", "et1", start, 30));
+    slots.try_add(slot("s2", "et2", start, 60));
+    slots.try_add(slot("s4", "et2", start + Duration::minutes(30), 60));
+    slots.try_add(slot("s3", "et1", start + Duration::hours(2), 30));
+    slots.try_add(slot("s-out", "et1", start + Duration::days(14), 30));
     backend::AppState {
         event_types: Arc::new(event_types),
         slots: Arc::new(slots),
@@ -452,7 +452,7 @@ async fn bookings_reschedule_to_off_grid_slot_returns_400() {
     let base = common::floor_grid(Utc::now() + Duration::days(1));
     state
         .slots
-        .add(slot("s-off-grid", "et1", base + Duration::minutes(17), 30));
+        .try_add(slot("s-off-grid", "et1", base + Duration::minutes(17), 30));
     let app = backend::app_with_state(state);
     seed_booking(&app, "b1", "s1").await;
 

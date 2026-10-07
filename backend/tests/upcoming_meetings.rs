@@ -23,7 +23,7 @@ fn booking(id: &str, slot_id: &str, name: &str, email: &str) -> Booking {
 /// Тип et1 (30 мин), предстоящий слот s1 (завтра) и прошедший s-past.
 fn seeded_state() -> backend::AppState {
     let event_types = InMemoryEventTypes::new();
-    event_types.add(EventType {
+    event_types.try_add(EventType {
         id: "et1".to_string(),
         title: "Созвон".to_string(),
         description: None,
@@ -43,8 +43,8 @@ fn seeded_state() -> backend::AppState {
         start_date_time: Utc::now() - Duration::days(30),
         end_date_time: Utc::now() - Duration::days(30) + Duration::minutes(30),
     };
-    slots.add(s1.clone());
-    slots.add(s_past.clone());
+    slots.try_add(s1.clone());
+    slots.try_add(s_past.clone());
     let bookings = InMemoryBookings::new();
     bookings.try_add(booking("b1", "s1", "Гость", "g@example.com"), &s1);
     bookings.try_add(

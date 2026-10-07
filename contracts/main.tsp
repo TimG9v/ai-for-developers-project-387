@@ -50,7 +50,7 @@ namespace Booking {
     eventTitle: string;
   }
 
-  @doc("Интервал времени уже занят: записи не должны пересекаться по времени слота, включая слоты разных типов встреч.")
+  @doc("Конфликт: интервал времени уже занят, либо тип встречи/слот с таким же содержимым уже существуют — повторные отправки формы и сетевые повторы не создают дубликатов.")
   model ConflictError {
     @statusCode statusCode: 409;
   }
@@ -71,18 +71,18 @@ namespace Booking {
     @statusCode statusCode: 400;
   }
 
-  @doc("Типы встреч: создаёт владелец, смотрят все.")
+  @doc("Типы встреч: создаёт владелец, смотрят все. Повторное создание типа с теми же названием и длительностью отклоняется 409 — дубликаты не поддерживаются.")
   @route("/event-types")
   interface EventTypes {
     @get list(): EventType[];
-    @post create(@body body: EventType): EventType | ValidationError;
+    @post create(@body body: EventType): EventType | ConflictError | ValidationError;
   }
 
-  @doc("Слоты: публикует владелец. Свободные слоты выдаются в окне 14 дней от текущей даты.")
+  @doc("Слоты: публикует владелец. Свободные слоты выдаются в окне 14 дней от текущей даты. Повторная публикация слота с тем же типом встречи и временем начала отклоняется 409.")
   @route("/slots")
   interface Slots {
     @get list(@query eventTypeId?: string): Slot[];
-    @post create(@body body: Slot): Slot | ValidationError | NotFoundError;
+    @post create(@body body: Slot): Slot | ConflictError | NotFoundError | ValidationError;
   }
 
   @doc("""

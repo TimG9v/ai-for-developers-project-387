@@ -33,11 +33,20 @@ impl EventTypesRepository for InMemoryEventTypes {
             .cloned()
     }
 
-    fn add(&self, event_type: EventType) {
-        self.items
-            .lock()
-            .expect("event types lock")
-            .push(event_type);
+    fn try_add(&self, event_type: EventType) -> bool {
+        // Проверка дубля по содержимому (название + длительность) и вставка —
+        // под одной блокировкой: два одновременных запроса (в т.ч. повторная
+        // отправка формы) не создадут два одинаковых типа.
+        let mut items = self.items.lock().expect("event types lock");
+        let duplicate = items.iter().any(|existing| {
+            existing.title.trim() == event_type.title.trim()
+                && existing.duration_minutes == event_type.duration_minutes
+        });
+        if duplicate {
+            return false;
+        }
+        items.push(event_type);
+        true
     }
 }
 
@@ -66,8 +75,21 @@ impl SlotsRepository for InMemorySlots {
             .cloned()
     }
 
-    fn add(&self, slot: Slot) {
-        self.items.lock().expect("slots lock").push(slot);
+    fn try_add(&self, slot: Slot) -> bool {
+        // Проверка дубля по содержимому (тип встречи + время начала; конец
+        // детерминирован длительностью типа) и вставка — под одной
+        // блокировкой: повторный POST или гонка двух запросов не создадут
+        // два одинаковых слота.
+        let mut items = self.items.lock().expect("slots lock");
+        let duplicate = items.iter().any(|existing| {
+            existing.event_type_id == slot.event_type_id
+                && existing.start_date_time == slot.start_date_time
+        });
+        if duplicate {
+            return false;
+        }
+        items.push(slot);
+        true
     }
 }
 

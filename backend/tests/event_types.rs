@@ -14,13 +14,13 @@ const EVENT_TYPES_REQUEST: &str = "/event-types";
 #[tokio::test]
 async fn event_types_list_returns_seeded_types_as_contract_json() {
     let repo = InMemoryEventTypes::new();
-    repo.add(EventType {
+    repo.try_add(EventType {
         id: "et1".to_string(),
         title: "Знакомство".to_string(),
         description: Some("Первичный созвон".to_string()),
         duration_minutes: 30,
     });
-    repo.add(EventType {
+    repo.try_add(EventType {
         id: "et2".to_string(),
         title: "Консультация".to_string(),
         description: None,
@@ -89,6 +89,96 @@ async fn event_types_create_returns_created_type_and_it_is_listed() {
     let items = json.as_array().expect("EventType[]");
     assert_eq!(items.len(), 1, "созданный тип появляется в списке: {json}");
     assert_eq!(items[0]["title"], "Созвон");
+}
+
+#[tokio::test]
+async fn event_types_create_rejects_content_duplicate_with_409() {
+    // Правило дубля — по содержимому (название + длительность), не по id:
+    // double-click формы шлёт разные id, но одинаковый тип обязан
+    // отклоняться 409 и не попадать в список.
+    let app = backend::app();
+    let first = r#"{"id":"et-a","title":"Созвон","durationMinutes":15}"#;
+    let duplicate_other_id = r#"{"id":"et-b","title":"Созвон","durationMinutes":15}"#;
+
+    let raw = common::send(
+        app.clone(),
+        &common::post_request(EVENT_TYPES_REQUEST, first),
+    )
+    .await;
+    assert!(raw.contains("HTTP/1.1 200"), "got: {raw}");
+
+    let raw = common::send(
+        app.clone(),
+        &common::post_request(EVENT_TYPES_REQUEST, duplicate_other_id),
+    )
+    .await;
+    assert!(
+        raw.contains("HTTP/1.1 409"),
+        "повтор типа с тем же названием и длительностью должен отклоняться 409, got: {raw}"
+    );
+
+    let raw = common::send(app, &common::get_request(EVENT_TYPES_REQUEST)).await;
+    let items: serde_json::Value =
+        serde_json::from_str(common::response_body(&raw)).expect("JSON-тело");
+    let items = items.as_array().expect("EventType[]");
+    assert_eq!(items.len(), 1, "дубль не попадает в список: {items:?}");
+    assert_eq!(items[0]["id"], "et-a", "остаётся первая копия");
+}
+
+#[tokio::test]
+async fn event_types_create_duplicate_key_ignores_title_whitespace() {
+    // Название сравнивается без краевых пробелов — форма шлёт уже
+    // обрезанное значение, а прямой запрос с пробелами не обходит правило.
+    let app = backend::app();
+    let first = r#"{"id":"et-a","title":"Созвон","durationMinutes":15}"#;
+    let padded = r#"{"id":"et-b","title":"  Созвон  ","durationMinutes":15}"#;
+
+    let raw = common::send(
+        app.clone(),
+        &common::post_request(EVENT_TYPES_REQUEST, first),
+    )
+    .await;
+    assert!(raw.contains("HTTP/1.1 200"), "got: {raw}");
+
+    let raw = common::send(app, &common::post_request(EVENT_TYPES_REQUEST, padded)).await;
+    assert!(
+        raw.contains("HTTP/1.1 409"),
+        "краевые пробелы не обходят правило дубля, got: {raw}"
+    );
+}
+
+#[tokio::test]
+async fn event_types_create_different_content_is_not_a_duplicate() {
+    // Разное содержимое (название или длительность) — разные типы,
+    // осознанное ограничение демки касается только полных совпадений.
+    let app = backend::app();
+    let first = r#"{"id":"et-a","title":"Созвон","durationMinutes":15}"#;
+    let other_title = r#"{"id":"et-b","title":"Консультация","durationMinutes":15}"#;
+    let other_duration = r#"{"id":"et-c","title":"Созвон","durationMinutes":30}"#;
+
+    let raw = common::send(
+        app.clone(),
+        &common::post_request(EVENT_TYPES_REQUEST, first),
+    )
+    .await;
+    assert!(raw.contains("HTTP/1.1 200"), "got: {raw}");
+
+    for body in [other_title, other_duration] {
+        let raw = common::send(
+            app.clone(),
+            &common::post_request(EVENT_TYPES_REQUEST, body),
+        )
+        .await;
+        assert!(
+            raw.contains("HTTP/1.1 200"),
+            "тело {body} отличается содержимым и не дубль, got: {raw}"
+        );
+    }
+
+    let raw = common::send(app, &common::get_request(EVENT_TYPES_REQUEST)).await;
+    let items: serde_json::Value =
+        serde_json::from_str(common::response_body(&raw)).expect("JSON-тело");
+    assert_eq!(items.as_array().expect("EventType[]").len(), 3);
 }
 
 #[tokio::test]

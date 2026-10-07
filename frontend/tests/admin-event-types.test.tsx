@@ -130,6 +130,21 @@ describe("admin page creates event types", () => {
     );
   });
 
+  it("names the duplicate on 409 instead of a silent double", async () => {
+    eventTypesCreate.mockResolvedValueOnce({ data: undefined, error: { status: 409 } });
+
+    render(<AdminEventTypes initialEventTypes={[]} />);
+    fillForm();
+    submit();
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Тип встречи с таким названием и длительностью уже существует",
+    );
+  });
+
   it("renders the initial event types from the server", () => {
     render(
       <AdminEventTypes
