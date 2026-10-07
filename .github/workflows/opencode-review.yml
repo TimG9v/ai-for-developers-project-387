@@ -4,9 +4,18 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
+# Новый push в PR отменяет предыдущее ревью: виснущие прогоны
+# не копятся в очереди (зависание task-9, PR #15).
+concurrency:
+  group: opencode-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   review:
     runs-on: ubuntu-latest
+    # Прогоны opencode периодически зависают молча; дефолт GitHub —
+    # 360 минут. Режем через 15: ревью либо успевает, либо отменяется.
+    timeout-minutes: 15
     permissions:
       id-token: write
       contents: read
