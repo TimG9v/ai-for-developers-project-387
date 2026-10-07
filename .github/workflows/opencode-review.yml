@@ -28,6 +28,15 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      # Ревью-агент после комментария полез делать git-коммит в песочнице
+      # раннера и падал «Author identity unknown» (PR #15, 2026-10-07):
+      # задаём identity, чтобы агент мог довести свои локальные проверки
+      # до конца. persist-credentials: false — пушить всё равно нечем.
+      - name: Git identity для ревью-агента
+        run: |
+          git config user.name "opencode-review-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
         env:
@@ -50,4 +59,6 @@ jobs:
             Оставь замечания комментарием к pull request: каждое —
             отдельным пунктом, с файлом и строкой. Если замечаний нет —
             короткое резюме «существенных замечаний нет».
-            Не мержи и не одобряй PR.
+            Не мержи и не одобряй PR. Коммитов и пушей не делай:
+            репозиторий для тебя только для чтения, результат ревью —
+            исключительно комментарий к PR.
