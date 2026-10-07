@@ -43,7 +43,9 @@ export function AdminSlots({ eventTypes }: { eventTypes: EventType[] }) {
       },
     });
     if (error !== undefined) {
-      setErrorMessage("Не удалось опубликовать слот: сервер отклонил данные");
+      setErrorMessage(
+        "Не удалось опубликовать слот: сервер отклонил данные. Время должно быть кратно 30 минутам (:00/:30), слот — в окне 14 дней",
+      );
       return;
     }
 

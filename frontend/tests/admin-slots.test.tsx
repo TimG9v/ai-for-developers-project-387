@@ -96,5 +96,8 @@ describe("admin page publishes slots", () => {
     expect(screen.getByRole("alert").textContent).toContain(
       "Не удалось опубликовать слот",
     );
+    // 400 от сервера чаще всего про сетку/окно — подсказываем причину
+    // (ревью PR #15: форма молча показывала общий текст).
+    expect(screen.getByRole("alert").textContent).toContain("30 минутам");
   });
 });
