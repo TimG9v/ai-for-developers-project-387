@@ -1,0 +1,81 @@
+name: opencode-scheduled
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # ежедневно 06:00 по Москве
+      timezone: Europe/Moscow
+  workflow_dispatch:
+
+jobs:
+  quality-check:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Warm up app (Render cold start)
+        run: |
+          code="000"
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" \
+              --max-time 60 "${{ vars.APP_URL }}")
+            echo "attempt $i: HTTP $code"
+            [ "$code" = "200" ] && break
+            sleep 10
+          done
+          [ "$code" = "200" ] || {
+            echo "app did not return 200, last code: $code" >&2
+            exit 1
+          }
+
+      - name: Collect Lighthouse report
+        run: |
+          mkdir -p lighthouse
+          npx --yes lighthouse@13 "${{ vars.APP_URL }}" \
+            --output json \
+            --output-path ./lighthouse/report.json \
+            --chrome-flags="--headless=new" \
+            --quiet
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: lighthouse-report
+          path: lighthouse/report.json
+
+      - name: Today
+        id: today
+        run: echo "date=$(date +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+        with:
+          model: zai-coding-plan/glm-5.3-flash
+          share: false
+          prompt: |
+            Прочитай файл lighthouse/report.json — свежий отчёт
+            Lighthouse публичной страницы приложения «Календарь
+            звонков» (адрес в переменной репозитория APP_URL).
+            Проанализируй оценки категорий (performance,
+            accessibility, best-practices, seo) и метрики Core Web
+            Vitals (FCP, LCP, TBT, CLS, SI).
+            Затем создай РОВНО ОДНУ новую issue в этом репозитории:
+            - заголовок: «Lighthouse: регулярная проверка
+              ${{ steps.today.outputs.date }}»;
+            - тело: 1) оценки четырёх категорий, 2) топ-5 проваленных
+              аудитов с наибольшим весом и их метрики, 3) по каждой
+              проблеме — конкретная рекомендация (что править в
+              frontend/, если источник очевиден).
+            Не создавай ветки, коммиты и pull request'ы. Не
+            комментируй существующие issues. Итог прогона — только
+            эта issue.
