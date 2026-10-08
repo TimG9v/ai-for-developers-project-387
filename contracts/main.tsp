@@ -106,6 +106,36 @@ namespace Booking {
     reschedule(@path id: string, @body body: RescheduleRequest): Booking | NotFoundError | ConflictError | ValidationError;
   }
 
+  @doc("Правило рабочего окна: дни недели и интервал настенного времени в пределах одних суток.")
+  model WorkingHoursRule {
+    @doc("Дни недели в ISO-нумерации: 1 — понедельник … 7 — воскресенье")
+    weekdays: int32[];
+    @doc("Начало окна, «HH:MM», на 30-минутной сетке")
+    startTime: string;
+    @doc("Конец окна, «HH:MM», на 30-минутной сетке; позже начала, в пределах суток")
+    endTime: string;
+  }
+
+  @doc("Рабочие часы владельца: IANA-зона и набор правил окон; расписание одно на владельца.")
+  model WorkingHours {
+    @doc("IANA-имя часовой зоны владельца, например «Europe/Moscow»")
+    timeZone: string;
+    @doc("Правила окон; пустой массив выключает рабочие окна")
+    rules: WorkingHoursRule[];
+  }
+
+  @doc("""
+    Рабочие часы владельца. PUT валидирует расписание и материализует его
+    в слоты всех типов встреч на горизонте 14 дней (вставка без дубликатов);
+    незанятые слоты, выпавшие из расписания, удаляются, слоты с записями
+    не трогаются. Ручная публикация слотов остаётся разовым сценарием вне окон.
+  """)
+  @route("/working-hours")
+  interface WorkingHoursApi {
+    @get get(): WorkingHours;
+    @put replace(@body body: WorkingHours): WorkingHours | ValidationError;
+  }
+
   @doc("Предстоящие встречи: записи со временем слота и типом встречи; прошедшие не отдаются.")
   @route("/upcoming-meetings")
   interface UpcomingMeetings {

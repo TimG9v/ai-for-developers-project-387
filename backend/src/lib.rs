@@ -3,6 +3,7 @@ pub mod domain;
 pub mod infra;
 pub mod seed;
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use axum::{
@@ -15,8 +16,11 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::api::api_types::{Booking, EventType, RescheduleRequest, Slot};
-use crate::domain::{BookingsRepository, EventTypesRepository, RescheduleError, SlotsRepository};
+use crate::api::api_types::{Booking, EventType, RescheduleRequest, Slot, WorkingHours};
+use crate::domain::{
+    BookingsRepository, EventTypesRepository, RescheduleError, SlotsRepository,
+    WorkingHoursRepository,
+};
 
 /// Адрес для `TcpListener::bind`: loopback, порт из `BACKEND_PORT`
 /// (дефолт 8081). `PORT` — не здесь: это публичный порт Next.js в контейнере.
@@ -30,6 +34,7 @@ pub struct AppState {
     pub event_types: Arc<dyn EventTypesRepository>,
     pub slots: Arc<dyn SlotsRepository>,
     pub bookings: Arc<dyn BookingsRepository>,
+    pub working_hours: Arc<dyn WorkingHoursRepository>,
 }
 
 #[derive(Serialize)]
@@ -43,6 +48,7 @@ pub fn app() -> Router {
         event_types: Arc::new(infra::InMemoryEventTypes::new()),
         slots: Arc::new(infra::InMemorySlots::new()),
         bookings: Arc::new(infra::InMemoryBookings::new()),
+        working_hours: Arc::new(infra::InMemoryWorkingHours::new()),
     })
 }
 
@@ -55,6 +61,10 @@ pub fn app_with_state(state: AppState) -> Router {
             get(list_event_types).post(create_event_type),
         )
         .route("/slots", get(list_slots).post(create_slot))
+        .route(
+            "/working-hours",
+            get(get_working_hours).put(replace_working_hours),
+        )
         .route("/bookings", get(list_bookings).post(create_booking))
         .route("/bookings/{id}", delete(cancel_booking))
         .route("/bookings/{id}/reschedule", post(reschedule_booking))
@@ -146,6 +156,62 @@ async fn create_slot(
         return StatusCode::CONFLICT.into_response();
     }
     Json(slot).into_response()
+}
+
+/// Текущие рабочие часы владельца: сохранённое расписание или пустое
+/// по умолчанию (окна выключены, зона UTC).
+async fn get_working_hours(State(state): State<AppState>) -> Json<WorkingHours> {
+    Json(state.working_hours.get())
+}
+
+/// Ключ содержимого слота — тип встречи + время начала (конец
+/// детерминирован длительностью типа), как в insert-if-absent репозитория.
+fn slot_key(slot: &Slot) -> (String, DateTime<Utc>) {
+    (slot.event_type_id.clone(), slot.start_date_time)
+}
+
+/// Сохранение рабочих часов владельцем. Валидация — до любой мутации
+/// (400: расписание не применено, множество слотов не изменилось). Затем
+/// атомарная материализация: желаемое множество («расписание × типы встреч»
+/// на горизонте 14 дней) добавляется без дубликатов (insert-if-absent);
+/// незанятые слоты, покрытые старым или новым расписанием, но выпавшие из
+/// желаемого множества, удаляются; слоты с записями не удаляются никогда —
+/// `Booking.slotId` стабилен, запись переживает смену расписания.
+async fn replace_working_hours(
+    State(state): State<AppState>,
+    working_hours: Result<Json<WorkingHours>, JsonRejection>,
+) -> Response {
+    let working_hours = match working_hours {
+        Ok(Json(working_hours)) => working_hours,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    if domain::validate_working_hours(&working_hours).is_err() {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    let now: DateTime<Utc> = Utc::now();
+    let event_types = state.event_types.list();
+    let desired = domain::deploy_working_hours(&working_hours, &event_types, now);
+    let previous = state.working_hours.get();
+    let desired_keys: HashSet<(String, DateTime<Utc>)> = desired.iter().map(slot_key).collect();
+    let covered: HashSet<(String, DateTime<Utc>)> = desired
+        .iter()
+        .chain(domain::deploy_working_hours(&previous, &event_types, now).iter())
+        .map(slot_key)
+        .collect();
+    for slot in desired {
+        state.slots.try_add(slot);
+    }
+    for slot in state.slots.list() {
+        let key = slot_key(&slot);
+        if covered.contains(&key)
+            && !desired_keys.contains(&key)
+            && !state.bookings.contains_slot(&slot.id)
+        {
+            state.slots.remove(&slot.id);
+        }
+    }
+    state.working_hours.set(working_hours.clone());
+    Json(working_hours).into_response()
 }
 
 /// Список записей — ракурс владельца (история 4); без охраны (ADR 0002).

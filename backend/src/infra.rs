@@ -5,8 +5,11 @@ use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 
-use crate::api::api_types::{Booking, EventType, Slot};
-use crate::domain::{BookingsRepository, EventTypesRepository, RescheduleError, SlotsRepository};
+use crate::api::api_types::{Booking, EventType, Slot, WorkingHours};
+use crate::domain::{
+    BookingsRepository, EventTypesRepository, RescheduleError, SlotsRepository,
+    WorkingHoursRepository,
+};
 
 #[derive(Default)]
 pub struct InMemoryEventTypes {
@@ -90,6 +93,50 @@ impl SlotsRepository for InMemorySlots {
         }
         items.push(slot);
         true
+    }
+
+    /// Удалить слот по идентификатору (перегенерация рабочих часов убирает
+    /// только незанятые слоты — занятость проверяет вызывающий); true —
+    /// слот был и удалён.
+    fn remove(&self, id: &str) -> bool {
+        let mut items = self.items.lock().expect("slots lock");
+        let before = items.len();
+        items.retain(|slot| slot.id != id);
+        items.len() < before
+    }
+}
+
+/// Пустое расписание по умолчанию: окна выключены, зона UTC.
+fn default_working_hours() -> WorkingHours {
+    WorkingHours {
+        time_zone: "UTC".to_string(),
+        rules: Vec::new(),
+    }
+}
+
+/// Хранилище единственного расписания рабочих часов владельца.
+#[derive(Default)]
+pub struct InMemoryWorkingHours {
+    current: Mutex<Option<WorkingHours>>,
+}
+
+impl InMemoryWorkingHours {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl WorkingHoursRepository for InMemoryWorkingHours {
+    fn get(&self) -> WorkingHours {
+        self.current
+            .lock()
+            .expect("working hours lock")
+            .clone()
+            .unwrap_or_else(default_working_hours)
+    }
+
+    fn set(&self, working_hours: WorkingHours) {
+        *self.current.lock().expect("working hours lock") = Some(working_hours);
     }
 }
 

@@ -1,14 +1,19 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { slotsList, type EventType, type Slot } from "@/src/client";
+import {
+  slotsList,
+  workingHoursApiGet,
+  type EventType,
+  type Slot,
+} from "@/src/client";
 
 // Same-origin конфиг SDK для браузера (тикет #20) — см. admin-event-types.
 import "@/src/api-config";
 
 import { BookingForm } from "@/components/booking-form";
-import { formatSlotInterval } from "@/lib/slot-time";
+import { formatSlotIntervalInZone, viewerTimeZone } from "@/lib/slot-time";
 
 /**
  * Страница записи: гость выбирает тип встречи, затем свободный слот и
@@ -25,6 +30,7 @@ export function BookingEventTypes({
   );
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+  const [ownerTimeZone, setOwnerTimeZone] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{
     title: string;
     interval: string;
@@ -32,6 +38,23 @@ export function BookingEventTypes({
     manageUrl: string;
   } | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
+
+  // Слоты рендерятся в зоне устройства гостя; подпись зоны у каждого
+  // интервала делает «чей это час» явным (issue #9).
+  const guestZone = viewerTimeZone();
+
+  // Зона владельца из расписания рабочих часов — показывается рядом.
+  useEffect(() => {
+    let cancelled = false;
+    void workingHoursApiGet().then(({ data }) => {
+      if (!cancelled && data) {
+        setOwnerTimeZone(data.timeZone);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const selectedEventType = initialEventTypes.find(
     (eventType) => eventType.id === selectedEventTypeId,
@@ -80,9 +103,10 @@ export function BookingEventTypes({
       if (slot) {
         setConfirmation({
           title: selectedEventType?.title ?? "встреча",
-          interval: formatSlotInterval(
+          interval: formatSlotIntervalInZone(
             new Date(slot.startDateTime),
             new Date(slot.endDateTime),
+            guestZone,
           ),
           email: guestEmail,
           // id записи — фактически unguessable-токен (ADR 0002): гость
@@ -92,8 +116,8 @@ export function BookingEventTypes({
       }
       void refreshCalendar();
     },
-    [refreshCalendar, selectedEventType, slots, selectedSlotId],
-  );
+      [guestZone, refreshCalendar, selectedEventType, slots, selectedSlotId],
+    );
 
   if (initialEventTypes.length === 0) {
     return (
@@ -138,6 +162,11 @@ export function BookingEventTypes({
         ))}
       </ul>
 
+      <p className="text-sm text-muted-foreground">
+        Время слотов показано в вашем часовом поясе ({guestZone})
+        {ownerTimeZone ? ` · рабочие часы владельца: ${ownerTimeZone}` : ""}.
+      </p>
+
       {selectedEventType === undefined ? (
         <p className="text-muted-foreground">
           Выберите тип встречи, чтобы увидеть свободные слоты
@@ -149,9 +178,10 @@ export function BookingEventTypes({
       ) : (
         <ul className="flex w-full flex-col gap-3" aria-label="Свободные слоты">
           {slots.map((slot) => {
-            const interval = formatSlotInterval(
+            const interval = formatSlotIntervalInZone(
               new Date(slot.startDateTime),
               new Date(slot.endDateTime),
+              guestZone,
             );
             return (
               <li key={slot.id}>
@@ -209,6 +239,7 @@ export function BookingEventTypes({
       {selectedSlot && (
         <BookingForm
           slot={selectedSlot}
+          timeZone={guestZone}
           onBooked={handleBooked}
           onRejected={handleRejected}
         />

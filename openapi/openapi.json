@@ -272,6 +272,53 @@
           }
         }
       }
+    },
+    "/working-hours": {
+      "get": {
+        "operationId": "WorkingHoursApi_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingHours"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "WorkingHoursApi_replace",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The request has succeeded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkingHours"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Невалидный ввод: обязательные поля пусты или значения вне допустимых границ."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkingHours"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -414,6 +461,54 @@
           }
         },
         "description": "Предстоящая встреча: ракурс владельца — запись со временем слота и типом встречи."
+      },
+      "WorkingHours": {
+        "type": "object",
+        "required": [
+          "timeZone",
+          "rules"
+        ],
+        "properties": {
+          "timeZone": {
+            "type": "string",
+            "description": "IANA-имя часовой зоны владельца, например «Europe/Moscow»"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkingHoursRule"
+            },
+            "description": "Правила окон; пустой массив выключает рабочие окна"
+          }
+        },
+        "description": "Рабочие часы владельца: IANA-зона и набор правил окон; расписание одно на владельца."
+      },
+      "WorkingHoursRule": {
+        "type": "object",
+        "required": [
+          "weekdays",
+          "startTime",
+          "endTime"
+        ],
+        "properties": {
+          "weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Дни недели в ISO-нумерации: 1 — понедельник … 7 — воскресенье"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "Начало окна, «HH:MM», на 30-минутной сетке"
+          },
+          "endTime": {
+            "type": "string",
+            "description": "Конец окна, «HH:MM», на 30-минутной сетке; позже начала, в пределах суток"
+          }
+        },
+        "description": "Правило рабочего окна: дни недели и интервал настенного времени в пределах одних суток."
       }
     }
   }

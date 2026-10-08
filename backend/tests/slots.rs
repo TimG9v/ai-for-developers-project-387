@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use backend::api::api_types::{EventType, Slot};
 use backend::domain::{EventTypesRepository, SlotsRepository};
-use backend::infra::{InMemoryBookings, InMemoryEventTypes, InMemorySlots};
+use backend::infra::{InMemoryBookings, InMemoryEventTypes, InMemorySlots, InMemoryWorkingHours};
 use chrono::{Duration, Utc};
 
 fn event_type(id: &str, title: &str, duration_minutes: i32) -> EventType {
@@ -42,6 +42,7 @@ fn seeded_state() -> backend::AppState {
         event_types: Arc::new(event_types),
         slots: Arc::new(InMemorySlots::new()),
         bookings: Arc::new(InMemoryBookings::new()),
+        working_hours: Arc::new(InMemoryWorkingHours::new()),
     }
 }
 
@@ -355,6 +356,7 @@ async fn slots_list_returns_only_slots_of_type_within_window() {
         event_types: state.event_types,
         slots: Arc::new(slots_repo),
         bookings: state.bookings,
+        working_hours: Arc::new(InMemoryWorkingHours::new()),
     };
     let app = backend::app_with_state(state);
 

@@ -1,12 +1,15 @@
 import {
   upcomingMeetingsList,
   eventTypesList,
+  workingHoursApiGet,
   type UpcomingMeeting,
+  type WorkingHours,
 } from "@/src/client";
 
 import { AdminCancelBooking } from "@/components/admin-cancel-booking";
 import { AdminEventTypes } from "@/components/admin-event-types";
 import { AdminSlots } from "@/components/admin-slots";
+import { AdminWorkingHours } from "@/components/admin-working-hours";
 import { formatSlotInterval } from "@/lib/slot-time";
 
 // Данные меняются в рантайме (in-memory хранилище).
@@ -21,10 +24,8 @@ type Meeting = {
 };
 
 export default async function AdminPage() {
-  const [eventTypesResult, meetingsResult] = await Promise.all([
-    eventTypesList(),
-    upcomingMeetingsList(),
-  ]);
+  const [eventTypesResult, meetingsResult, workingHoursResult] =
+    await Promise.all([eventTypesList(), upcomingMeetingsList(), workingHoursApiGet()]);
   const eventTypes = eventTypesResult.data ?? [];
   const meetings: Meeting[] = (meetingsResult.data ?? []).map(
     (meeting: UpcomingMeeting) => ({
@@ -38,11 +39,19 @@ export default async function AdminPage() {
       eventTitle: meeting.eventTitle,
     }),
   );
+  // Расписание передаётся как есть; дефолт зоны формы (зона браузера
+  // владельца) вычисляет клиентский компонент, пока расписание не сохранено:
+  // сервер не знает зону устройства.
+  const initialWorkingHours: WorkingHours = workingHoursResult.data ?? {
+    timeZone: "UTC",
+    rules: [],
+  };
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col items-center gap-6 px-6 py-16">
       <h1 className="text-3xl font-semibold tracking-tight">Админка</h1>
       <AdminEventTypes initialEventTypes={eventTypes} />
+      <AdminWorkingHours initialWorkingHours={initialWorkingHours} />
       <AdminSlots eventTypes={eventTypes} />
 
       <section className="flex w-full max-w-2xl flex-col gap-4">

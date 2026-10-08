@@ -13,6 +13,7 @@ async fn main() {
         event_types: Arc::new(backend::infra::InMemoryEventTypes::new()),
         slots: Arc::new(backend::infra::InMemorySlots::new()),
         bookings: Arc::new(backend::infra::InMemoryBookings::new()),
+        working_hours: Arc::new(backend::infra::InMemoryWorkingHours::new()),
     };
     if std::env::var("BACKEND_SEED_DEMO").as_deref() != Ok("0") {
         backend::seed::seed_demo(state.event_types.as_ref(), state.slots.as_ref());

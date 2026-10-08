@@ -5,6 +5,9 @@ vi.mock("@/src/client", () => ({
   eventTypesList: vi.fn(async () => ({ data: [] })),
   slotsList: vi.fn(async () => ({ data: [] })),
   upcomingMeetingsList: vi.fn(async () => ({ data: [] })),
+  workingHoursApiGet: vi.fn(async () => ({
+    data: { timeZone: "UTC", rules: [] },
+  })),
   bookingsCancel: vi.fn(async () => ({ data: undefined })),
 }));
 
