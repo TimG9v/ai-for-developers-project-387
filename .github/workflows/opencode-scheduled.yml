@@ -9,6 +9,14 @@ on:
 jobs:
   quality-check:
     runs-on: ubuntu-latest
+    # Предохранитель от «тихих» зависаний шага агента: дефолт GitHub —
+    # 360 минут (инцидент 37750627398, 55+ мин до ручной отмены).
+    timeout-minutes: 20
+    # Ночной и ручной запуски не идут параллельно: новый отменяет
+    # зависший старый, дубли issue и двойной расход исключены.
+    concurrency:
+      group: opencode-scheduled
+      cancel-in-progress: true
     permissions:
       id-token: write
       contents: write
