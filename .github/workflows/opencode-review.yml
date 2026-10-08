@@ -12,6 +12,12 @@ concurrency:
 
 jobs:
   review:
+    # `opencode github run` требует collaborator-permission у автора PR
+    # (actor события pull_request); у ботов — opencode-agent,
+    # release-please — она равна none, прогон падает до старта агента.
+    # Ревью бот-PR — /oc-комментарием человека на PR (actor = человек,
+    # гейт проходит).
+    if: github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     # Прогоны opencode периодически зависают молча; дефолт GitHub —
     # 360 минут. Режем через 30: маленькие PR ревьювятся за 2–3 минуты,
