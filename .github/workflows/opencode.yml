@@ -19,6 +19,16 @@ jobs:
       contains(github.event.comment.body, '/opencode')) &&
       github.event.comment.user.type != 'Bot'
     runs-on: ubuntu-latest
+    # Прогоны агента периодически зависают молча (2ч10м до ручной отмены,
+    # 2026-10-08; task-9, PR #15) — дефолт GitHub 360 минут, успешные
+    # прогоны укладываются в ~13 минут.
+    timeout-minutes: 20
+    # Повторный запуск той же команды отменяет её предыдущий прогон,
+    # а не висит в очереди. Ключ — id комментария: разные команды
+    # в разных тредах выполняются независимо, как и раньше.
+    concurrency:
+      group: opencode-${{ github.event.comment.id }}
+      cancel-in-progress: true
     permissions:
       id-token: write
     steps:
