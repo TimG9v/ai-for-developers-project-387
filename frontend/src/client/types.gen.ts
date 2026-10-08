@@ -74,6 +74,38 @@ export type UpcomingMeeting = {
     eventTitle: string;
 };
 
+/**
+ * Рабочие часы владельца: IANA-зона и набор правил окон; расписание одно на владельца.
+ */
+export type WorkingHours = {
+    /**
+     * IANA-имя часовой зоны владельца, например «Europe/Moscow»
+     */
+    timeZone: string;
+    /**
+     * Правила окон; пустой массив выключает рабочие окна
+     */
+    rules: Array<WorkingHoursRule>;
+};
+
+/**
+ * Правило рабочего окна: дни недели и интервал настенного времени в пределах одних суток.
+ */
+export type WorkingHoursRule = {
+    /**
+     * Дни недели в ISO-нумерации: 1 — понедельник … 7 — воскресенье
+     */
+    weekdays: Array<number>;
+    /**
+     * Начало окна, «HH:MM», на 30-минутной сетке
+     */
+    startTime: string;
+    /**
+     * Конец окна, «HH:MM», на 30-минутной сетке; позже начала, в пределах суток
+     */
+    endTime: string;
+};
+
 export type BookingsListData = {
     body?: never;
     path?: never;
@@ -286,3 +318,42 @@ export type UpcomingMeetingsListResponses = {
 };
 
 export type UpcomingMeetingsListResponse = UpcomingMeetingsListResponses[keyof UpcomingMeetingsListResponses];
+
+export type WorkingHoursApiGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/working-hours';
+};
+
+export type WorkingHoursApiGetResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: WorkingHours;
+};
+
+export type WorkingHoursApiGetResponse = WorkingHoursApiGetResponses[keyof WorkingHoursApiGetResponses];
+
+export type WorkingHoursApiReplaceData = {
+    body: WorkingHours;
+    path?: never;
+    query?: never;
+    url: '/working-hours';
+};
+
+export type WorkingHoursApiReplaceErrors = {
+    /**
+     * Невалидный ввод: обязательные поля пусты или значения вне допустимых границ.
+     */
+    400: unknown;
+};
+
+export type WorkingHoursApiReplaceResponses = {
+    /**
+     * The request has succeeded.
+     */
+    200: WorkingHours;
+};
+
+export type WorkingHoursApiReplaceResponse = WorkingHoursApiReplaceResponses[keyof WorkingHoursApiReplaceResponses];

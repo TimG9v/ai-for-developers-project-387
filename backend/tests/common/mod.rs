@@ -48,6 +48,14 @@ pub fn delete_request(path: &str) -> String {
     format!("DELETE {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
 }
 
+pub fn put_request(path: &str, body: &str) -> String {
+    format!(
+        "PUT {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    )
+}
+
 pub fn response_body(raw: &str) -> &str {
     raw.split("\r\n\r\n").nth(1).expect("response body")
 }

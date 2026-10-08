@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BookingsCancelData, BookingsCancelErrors, BookingsCancelResponses, BookingsCreateData, BookingsCreateErrors, BookingsCreateResponses, BookingsListData, BookingsListResponses, BookingsRescheduleData, BookingsRescheduleErrors, BookingsRescheduleResponses, EventTypesCreateData, EventTypesCreateErrors, EventTypesCreateResponses, EventTypesListData, EventTypesListResponses, SlotsCreateData, SlotsCreateErrors, SlotsCreateResponses, SlotsListData, SlotsListResponses, UpcomingMeetingsListData, UpcomingMeetingsListResponses } from './types.gen';
+import type { BookingsCancelData, BookingsCancelErrors, BookingsCancelResponses, BookingsCreateData, BookingsCreateErrors, BookingsCreateResponses, BookingsListData, BookingsListResponses, BookingsRescheduleData, BookingsRescheduleErrors, BookingsRescheduleResponses, EventTypesCreateData, EventTypesCreateErrors, EventTypesCreateResponses, EventTypesListData, EventTypesListResponses, SlotsCreateData, SlotsCreateErrors, SlotsCreateResponses, SlotsListData, SlotsListResponses, UpcomingMeetingsListData, UpcomingMeetingsListResponses, WorkingHoursApiGetData, WorkingHoursApiGetResponses, WorkingHoursApiReplaceData, WorkingHoursApiReplaceErrors, WorkingHoursApiReplaceResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -69,3 +69,14 @@ export const slotsCreate = <ThrowOnError extends boolean = false>(options: Optio
 });
 
 export const upcomingMeetingsList = <ThrowOnError extends boolean = false>(options?: Options<UpcomingMeetingsListData, ThrowOnError>): RequestResult<UpcomingMeetingsListResponses, unknown, ThrowOnError> => (options?.client ?? client).get<UpcomingMeetingsListResponses, unknown, ThrowOnError>({ url: '/upcoming-meetings', ...options });
+
+export const workingHoursApiGet = <ThrowOnError extends boolean = false>(options?: Options<WorkingHoursApiGetData, ThrowOnError>): RequestResult<WorkingHoursApiGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<WorkingHoursApiGetResponses, unknown, ThrowOnError>({ url: '/working-hours', ...options });
+
+export const workingHoursApiReplace = <ThrowOnError extends boolean = false>(options: Options<WorkingHoursApiReplaceData, ThrowOnError>): RequestResult<WorkingHoursApiReplaceResponses, WorkingHoursApiReplaceErrors, ThrowOnError> => (options.client ?? client).put<WorkingHoursApiReplaceResponses, WorkingHoursApiReplaceErrors, ThrowOnError>({
+    url: '/working-hours',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});

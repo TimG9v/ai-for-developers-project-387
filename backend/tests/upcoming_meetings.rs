@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use backend::api::api_types::{Booking, EventType, Slot};
 use backend::domain::{BookingsRepository, EventTypesRepository, SlotsRepository};
-use backend::infra::{InMemoryBookings, InMemoryEventTypes, InMemorySlots};
+use backend::infra::{InMemoryBookings, InMemoryEventTypes, InMemorySlots, InMemoryWorkingHours};
 use chrono::{Duration, Utc};
 
 fn booking(id: &str, slot_id: &str, name: &str, email: &str) -> Booking {
@@ -55,6 +55,7 @@ fn seeded_state() -> backend::AppState {
         event_types: Arc::new(event_types),
         slots: Arc::new(slots),
         bookings: Arc::new(bookings),
+        working_hours: Arc::new(InMemoryWorkingHours::new()),
     }
 }
 
