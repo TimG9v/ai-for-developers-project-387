@@ -7,6 +7,8 @@ import { workingHoursApiReplace, type WorkingHours } from "@/src/client";
 // Same-origin конфиг SDK для браузера (тикет #20) — см. admin-event-types.
 import "@/src/api-config";
 
+import { viewerTimeZone } from "@/lib/slot-time";
+
 const WEEKDAYS = [
   { value: 1, short: "Пн" },
   { value: 2, short: "Вт" },
@@ -43,7 +45,16 @@ export function AdminWorkingHours({
   initialWorkingHours: WorkingHours;
 }) {
   const firstRule = initialWorkingHours.rules[0];
-  const [timeZone, setTimeZone] = useState(initialWorkingHours.timeZone);
+  // Дефолт зоны — зона браузера владельца: вычисляется на клиенте (Intl),
+  // потому что сервер не знает зону устройства. Применяется, пока расписание
+  // не сохранено (это ещё GET-дефолт сервера «UTC без правил»); сохранённая
+  // зона не подменяется, даже если окна выключены.
+  const [timeZone, setTimeZone] = useState(
+    initialWorkingHours.rules.length === 0 &&
+      initialWorkingHours.timeZone === "UTC"
+      ? viewerTimeZone()
+      : initialWorkingHours.timeZone,
+  );
   const [weekdays, setWeekdays] = useState<number[]>(firstRule?.weekdays ?? []);
   const [startTime, setStartTime] = useState(firstRule?.startTime ?? "10:00");
   const [endTime, setEndTime] = useState(firstRule?.endTime ?? "17:00");

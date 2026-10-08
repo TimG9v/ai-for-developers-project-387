@@ -8,6 +8,12 @@ vi.mock("@/src/client", () => ({
     workingHoursApiReplace(...args),
 }));
 
+// Зона «браузера» владельца фиксирована: не путать с зоной сохранённого
+// расписания в тестах ниже (Europe/Moscow).
+vi.mock("@/lib/slot-time", () => ({
+  viewerTimeZone: () => "Europe/Kaliningrad",
+}));
+
 import { AdminWorkingHours } from "@/components/admin-working-hours";
 
 const SAVED = { timeZone: "Europe/Moscow", rules: [] };
@@ -15,6 +21,24 @@ const SAVED = { timeZone: "Europe/Moscow", rules: [] };
 afterEach(cleanup);
 
 describe("admin working hours form", () => {
+  it("defaults the zone to the browser zone while the schedule is unsaved", () => {
+    render(
+      <AdminWorkingHours initialWorkingHours={{ timeZone: "UTC", rules: [] }} />,
+    );
+
+    expect(
+      (screen.getByLabelText("Часовой пояс") as HTMLSelectElement).value,
+    ).toBe("Europe/Kaliningrad");
+  });
+
+  it("keeps the saved zone even when the windows are off", () => {
+    render(<AdminWorkingHours initialWorkingHours={SAVED} />);
+
+    expect(
+      (screen.getByLabelText("Часовой пояс") as HTMLSelectElement).value,
+    ).toBe("Europe/Moscow");
+  });
+
   it("pre-fills from the saved schedule", () => {
     render(
       <AdminWorkingHours

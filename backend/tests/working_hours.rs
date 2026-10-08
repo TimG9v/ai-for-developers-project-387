@@ -7,7 +7,7 @@ mod common;
 use std::sync::Arc;
 
 use backend::api::api_types::{EventType, Slot};
-use backend::domain::EventTypesRepository;
+use backend::domain::{BOOKING_WINDOW_DAYS, EventTypesRepository};
 use backend::infra::{InMemoryBookings, InMemoryEventTypes, InMemorySlots};
 use chrono::{Datelike, Duration, TimeZone, Utc};
 
@@ -51,18 +51,22 @@ async fn put_schedule(app: axum::Router, body: &str) -> String {
 }
 
 /// Сколько дней горизонта (0..=14) попадают в окно с данным расписанием
-/// в зоне UTC: день недели входит в `weekdays` и его `wall_hour` ещё не
-/// прошёл (начало окна не в прошлом).
+/// в зоне UTC: день недели входит в `weekdays`, а начало окна лежит в
+/// продовом окне записи `now <= start <= now + BOOKING_WINDOW_DAYS` —
+/// то же условие, что в domain::is_within_booking_window, поэтому тест
+/// не зависит от времени суток.
 fn expected_window_days(weekdays: &[i32], wall_hour: u32) -> usize {
     let now = Utc::now();
     (0..=14)
         .filter(|offset| {
-            let day = (now + Duration::days(*offset)).date_naive();
+            let day = now.date_naive() + Duration::days(*offset);
             weekdays.contains(&(day.weekday().number_from_monday() as i32))
                 && day
                     .and_hms_opt(wall_hour, 0, 0)
                     .and_then(|naive| Utc.from_local_datetime(&naive).single())
-                    .is_some_and(|start| start >= now)
+                    .is_some_and(|start| {
+                        start >= now && start <= now + Duration::days(BOOKING_WINDOW_DAYS)
+                    })
         })
         .count()
 }

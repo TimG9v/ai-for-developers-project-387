@@ -10,7 +10,7 @@ import { AdminCancelBooking } from "@/components/admin-cancel-booking";
 import { AdminEventTypes } from "@/components/admin-event-types";
 import { AdminSlots } from "@/components/admin-slots";
 import { AdminWorkingHours } from "@/components/admin-working-hours";
-import { formatSlotInterval, viewerTimeZone } from "@/lib/slot-time";
+import { formatSlotInterval } from "@/lib/slot-time";
 
 // Данные меняются в рантайме (in-memory хранилище).
 export const dynamic = "force-dynamic";
@@ -39,15 +39,13 @@ export default async function AdminPage() {
       eventTitle: meeting.eventTitle,
     }),
   );
-  // Дефолт зоны формы — зона окружения, пока владелец не сохранил расписание.
-  const savedWorkingHours: WorkingHours = workingHoursResult.data ?? {
+  // Расписание передаётся как есть; дефолт зоны формы (зона браузера
+  // владельца) вычисляет клиентский компонент, пока расписание не сохранено:
+  // сервер не знает зону устройства.
+  const initialWorkingHours: WorkingHours = workingHoursResult.data ?? {
     timeZone: "UTC",
     rules: [],
   };
-  const initialWorkingHours: WorkingHours =
-    savedWorkingHours.rules.length === 0
-      ? { ...savedWorkingHours, timeZone: viewerTimeZone() }
-      : savedWorkingHours;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col items-center gap-6 px-6 py-16">
