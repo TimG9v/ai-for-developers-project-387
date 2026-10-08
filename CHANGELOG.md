@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.3.1...v0.3.2) (2026-10-08)
+
+
+### Bug Fixes
+
+* дубли типов и слотов отклоняются 409 ([#19](https://github.com/TimG9v/ai-for-developers-project-387/issues/19)) ([66c8316](https://github.com/TimG9v/ai-for-developers-project-387/commit/66c8316220bfe06e51f11611db3852b94fb42558))
+
 ## [0.3.1](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.3.0...v0.3.1) (2026-10-08)
 
 
