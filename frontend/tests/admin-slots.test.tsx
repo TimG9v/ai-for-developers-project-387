@@ -84,7 +84,11 @@ describe("admin page publishes slots", () => {
   });
 
   it("shows a server rejection message on 400/404", async () => {
-    slotsCreate.mockResolvedValueOnce({ data: undefined, error: { status: 400 } });
+    slotsCreate.mockResolvedValueOnce({
+      data: undefined,
+      error: {},
+      response: { status: 400 },
+    });
 
     render(<AdminSlots eventTypes={EVENT_TYPES} />);
     fillSlotForm();
@@ -99,5 +103,26 @@ describe("admin page publishes slots", () => {
     // 400 от сервера чаще всего про сетку/окно — подсказываем причину
     // (ревью PR #15: форма молча показывала общий текст).
     expect(screen.getByRole("alert").textContent).toContain("30 минутам");
+  });
+
+  it("names the duplicate on 409 instead of a silent double", async () => {
+    // Реальная форма результата SDK при не-2xx: error — нормализованное тело
+    // (у 409 без тела это {}), HTTP-статус живёт в response.status.
+    slotsCreate.mockResolvedValueOnce({
+      data: undefined,
+      error: {},
+      response: { status: 409 },
+    });
+
+    render(<AdminSlots eventTypes={EVENT_TYPES} />);
+    fillSlotForm();
+    fireEvent.click(screen.getByRole("button", { name: "Опубликовать слот" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Слот на это время уже опубликован",
+    );
   });
 });

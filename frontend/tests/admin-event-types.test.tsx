@@ -116,7 +116,11 @@ describe("admin page creates event types", () => {
   });
 
   it("shows a server rejection message on 400", async () => {
-    eventTypesCreate.mockResolvedValueOnce({ data: undefined, error: { status: 400 } });
+    eventTypesCreate.mockResolvedValueOnce({
+      data: undefined,
+      error: {},
+      response: { status: 400 },
+    });
 
     render(<AdminEventTypes initialEventTypes={[]} />);
     fillForm();
@@ -127,6 +131,27 @@ describe("admin page creates event types", () => {
     });
     expect(screen.getByRole("alert").textContent).toContain(
       "Не удалось создать тип встречи",
+    );
+  });
+
+  it("names the duplicate on 409 instead of a silent double", async () => {
+    // Реальная форма результата SDK при не-2xx: error — нормализованное тело
+    // (у 409 без тела это {}), HTTP-статус живёт в response.status.
+    eventTypesCreate.mockResolvedValueOnce({
+      data: undefined,
+      error: {},
+      response: { status: 409 },
+    });
+
+    render(<AdminEventTypes initialEventTypes={[]} />);
+    fillForm();
+    submit();
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeTruthy();
+    });
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Тип встречи с таким названием и длительностью уже существует",
     );
   });
 

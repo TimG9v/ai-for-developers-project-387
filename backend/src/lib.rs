@@ -71,7 +71,9 @@ async fn list_event_types(State(state): State<AppState>) -> Json<Vec<EventType>>
 }
 
 /// Создание типа встречи владельцем. Невалидный ввод — контрактный 400:
-/// и нераспарсиваемое тело, и нарушение правил домена.
+/// и нераспарсиваемое тело, и нарушение правил домена. Тип с теми же
+/// названием и длительностью — контрактный 409: проверка дубля и вставка
+/// атомарны (insert-if-absent), повторная отправка формы дубль не создаёт.
 async fn create_event_type(
     State(state): State<AppState>,
     event_type: Result<Json<EventType>, JsonRejection>,
@@ -83,7 +85,9 @@ async fn create_event_type(
     if domain::validate_event_type(&event_type).is_err() {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    state.event_types.add(event_type.clone());
+    if !state.event_types.try_add(event_type.clone()) {
+        return StatusCode::CONFLICT.into_response();
+    }
     Json(event_type).into_response()
 }
 
@@ -120,7 +124,10 @@ async fn list_slots(State(state): State<AppState>, query: Query<SlotsQuery>) -> 
 }
 
 /// Публикация слота владельцем. Несуществующий тип — контрактный 404,
-/// слот вне окна или с пустым интервалом — контрактный 400.
+/// слот вне окна или с пустым интервалом — контрактный 400, слот с тем же
+/// типом встречи и временем начала — контрактный 409: проверка дубля и
+/// вставка атомарны (insert-if-absent), повторная отправка формы дубль
+/// не создаёт.
 async fn create_slot(
     State(state): State<AppState>,
     slot: Result<Json<Slot>, JsonRejection>,
@@ -135,7 +142,9 @@ async fn create_slot(
     if domain::validate_slot(&slot, Utc::now(), &event_type).is_err() {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    state.slots.add(slot.clone());
+    if !state.slots.try_add(slot.clone()) {
+        return StatusCode::CONFLICT.into_response();
+    }
     Json(slot).into_response()
 }
 

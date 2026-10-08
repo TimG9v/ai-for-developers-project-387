@@ -41,7 +41,7 @@ export function AdminEventTypes({
       return;
     }
 
-    const { error } = await eventTypesCreate({
+    const { error, response } = await eventTypesCreate({
       body: {
         id: crypto.randomUUID(),
         title: title.trim(),
@@ -52,7 +52,14 @@ export function AdminEventTypes({
       },
     });
     if (error !== undefined) {
-      setFormMessage("Не удалось создать тип встречи: сервер отклонил данные");
+      // 409 — тип с теми же названием и длительностью уже существует
+      // (повторная отправка формы, сетевой повтор): дубль сервер не создаёт.
+      // HTTP-статус клиент кладёт в response.status, error — нормализованное тело.
+      setFormMessage(
+        response?.status === 409
+          ? "Тип встречи с таким названием и длительностью уже существует"
+          : "Не удалось создать тип встречи: сервер отклонил данные",
+      );
       return;
     }
 

@@ -36,8 +36,8 @@ fn slot(
 /// Состояние с двумя типами встреч: et1 (30 мин) и et2 (60 мин).
 fn seeded_state() -> backend::AppState {
     let event_types = InMemoryEventTypes::new();
-    event_types.add(event_type("et1", "Созвон", 30));
-    event_types.add(event_type("et2", "Консультация", 60));
+    event_types.try_add(event_type("et1", "Созвон", 30));
+    event_types.try_add(event_type("et2", "Консультация", 60));
     backend::AppState {
         event_types: Arc::new(event_types),
         slots: Arc::new(InMemorySlots::new()),
@@ -244,40 +244,108 @@ async fn slots_create_rejects_duration_mismatch_with_type_400() {
 }
 
 #[tokio::test]
+async fn slots_create_rejects_content_duplicate_with_409() {
+    // Правило дубля — по содержимому (тип встречи + время начала; конец
+    // детерминирован длительностью типа), не по id: double-click формы шлёт
+    // разные id, но повтор обязан отклоняться 409 и не попадать в список.
+    let state = seeded_state();
+    let start = common::floor_grid(Utc::now() + Duration::days(1));
+    let end = start + Duration::minutes(30);
+    let app = backend::app_with_state(state.clone());
+
+    let first = slot_body("et1", start, end);
+    let raw = common::send(app.clone(), &common::post_request("/slots", &first)).await;
+    assert!(raw.contains("HTTP/1.1 200"), "got: {raw}");
+
+    // Другой id, то же содержимое — сетевой повтор/double-click.
+    let duplicate = first.replace(r#""id":"s1""#, r#""id":"s2""#);
+    let raw = common::send(app.clone(), &common::post_request("/slots", &duplicate)).await;
+    assert!(
+        raw.contains("HTTP/1.1 409"),
+        "повтор слота с тем же типом и началом должен отклоняться 409, got: {raw}"
+    );
+
+    let raw = common::send(app, &common::get_request("/slots?eventTypeId=et1")).await;
+    let items: serde_json::Value =
+        serde_json::from_str(common::response_body(&raw)).expect("JSON-тело");
+    let items = items.as_array().expect("Slot[]");
+    assert_eq!(items.len(), 1, "дубль не попадает в список: {items:?}");
+    assert_eq!(items[0]["id"], "s1", "остаётся первая копия");
+}
+
+#[tokio::test]
+async fn slots_create_different_content_is_not_a_duplicate() {
+    // Разное содержимое — другой тип встречи или другое время начала:
+    // это разные слоты, ограничение касается только полных совпадений.
+    let state = seeded_state();
+    let start = common::floor_grid(Utc::now() + Duration::days(1));
+    let end = start + Duration::minutes(30);
+    let app = backend::app_with_state(state.clone());
+
+    let first = slot_body("et1", start, end);
+    let raw = common::send(app.clone(), &common::post_request("/slots", &first)).await;
+    assert!(raw.contains("HTTP/1.1 200"), "got: {raw}");
+
+    // Тот же тип, другое начало; тот же тип, но et2 длительностью 60 мин.
+    let other_start = slot_body("et1", start + Duration::hours(1), end + Duration::hours(1));
+    let raw = common::send(app.clone(), &common::post_request("/slots", &other_start)).await;
+    assert!(
+        raw.contains("HTTP/1.1 200"),
+        "другое начало — не дубль, got: {raw}"
+    );
+
+    let other_type = slot_body(
+        "et2",
+        start + Duration::minutes(30),
+        start + Duration::minutes(90),
+    );
+    let raw = common::send(app.clone(), &common::post_request("/slots", &other_type)).await;
+    assert!(
+        raw.contains("HTTP/1.1 200"),
+        "другой тип встречи — не дубль, got: {raw}"
+    );
+
+    let raw = common::send(app, &common::get_request("/slots")).await;
+    let items: serde_json::Value =
+        serde_json::from_str(common::response_body(&raw)).expect("JSON-тело");
+    assert_eq!(items.as_array().expect("Slot[]").len(), 3);
+}
+
+#[tokio::test]
 async fn slots_list_returns_only_slots_of_type_within_window() {
     let state = seeded_state();
     let slots_repo = InMemorySlots::new();
     let now = Utc::now();
     // В окне, нужный тип
-    slots_repo.add(slot(
+    slots_repo.try_add(slot(
         "s1",
         "et1",
         now + Duration::days(1),
         now + Duration::days(1) + Duration::minutes(30),
     ));
     // В окне, другой тип
-    slots_repo.add(slot(
+    slots_repo.try_add(slot(
         "s2",
         "et2",
         now + Duration::days(2),
         now + Duration::days(2) + Duration::minutes(60),
     ));
     // Нужный тип, но 15-й день — вне окна
-    slots_repo.add(slot(
+    slots_repo.try_add(slot(
         "s3",
         "et1",
         now + Duration::days(15),
         now + Duration::days(15) + Duration::minutes(30),
     ));
     // Нужный тип, но в прошлом
-    slots_repo.add(slot(
+    slots_repo.try_add(slot(
         "s4",
         "et1",
         now - Duration::hours(2),
         now - Duration::hours(2) + Duration::minutes(30),
     ));
     // Нужный тип, в окне на границе — 14-й день виден в списке
-    slots_repo.add(slot(
+    slots_repo.try_add(slot(
         "s5",
         "et1",
         now + Duration::days(14),

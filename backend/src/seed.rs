@@ -28,7 +28,7 @@ pub fn seed_demo(event_types: &dyn EventTypesRepository, slots: &dyn SlotsReposi
         return;
     }
     for (id, title, duration_minutes) in DEMO_EVENT_TYPES {
-        event_types.add(EventType {
+        event_types.try_add(EventType {
             id: id.to_string(),
             title: title.to_string(),
             description: Some("Демо-тип встречи".to_string()),
@@ -50,7 +50,7 @@ pub fn seed_demo(event_types: &dyn EventTypesRepository, slots: &dyn SlotsReposi
                 .get(type_id)
                 .expect("тип добавлен выше")
                 .duration_minutes;
-            slots.add(Slot {
+            slots.try_add(Slot {
                 id: format!("s-demo-{type_id}-{day}"),
                 event_type_id: type_id.to_string(),
                 start_date_time: start,
