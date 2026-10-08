@@ -34,7 +34,7 @@ export function AdminSlots({ eventTypes }: { eventTypes: EventType[] }) {
       startDateTime.getTime() + durationMinutes * 60 * 1000,
     );
 
-    const { error } = await slotsCreate({
+    const { error, response } = await slotsCreate({
       body: {
         id: crypto.randomUUID(),
         eventTypeId,
@@ -45,8 +45,9 @@ export function AdminSlots({ eventTypes }: { eventTypes: EventType[] }) {
     if (error !== undefined) {
       // 409 — слот с тем же типом встречи и временем начала уже опубликован
       // (повторная отправка формы, сетевой повтор): дубль сервер не создаёт.
+      // HTTP-статус клиент кладёт в response.status, error — нормализованное тело.
       setErrorMessage(
-        (error as { status?: number }).status === 409
+        response?.status === 409
           ? "Слот на это время уже опубликован"
           : "Не удалось опубликовать слот: сервер отклонил данные. Время должно быть кратно 30 минутам (:00/:30), слот — в окне 14 дней",
       );

@@ -84,7 +84,11 @@ describe("admin page publishes slots", () => {
   });
 
   it("shows a server rejection message on 400/404", async () => {
-    slotsCreate.mockResolvedValueOnce({ data: undefined, error: { status: 400 } });
+    slotsCreate.mockResolvedValueOnce({
+      data: undefined,
+      error: {},
+      response: { status: 400 },
+    });
 
     render(<AdminSlots eventTypes={EVENT_TYPES} />);
     fillSlotForm();
@@ -102,7 +106,13 @@ describe("admin page publishes slots", () => {
   });
 
   it("names the duplicate on 409 instead of a silent double", async () => {
-    slotsCreate.mockResolvedValueOnce({ data: undefined, error: { status: 409 } });
+    // Реальная форма результата SDK при не-2xx: error — нормализованное тело
+    // (у 409 без тела это {}), HTTP-статус живёт в response.status.
+    slotsCreate.mockResolvedValueOnce({
+      data: undefined,
+      error: {},
+      response: { status: 409 },
+    });
 
     render(<AdminSlots eventTypes={EVENT_TYPES} />);
     fillSlotForm();
