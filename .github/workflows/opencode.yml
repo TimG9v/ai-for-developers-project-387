@@ -8,9 +8,16 @@ on:
 
 jobs:
   opencode:
+    # Отчёт агента содержит ссылку https://opencode.ai/s/… — подстрока
+    # «/opencode» в ней проходит гейт, и бот перезапускает воркфлоу своим
+    # же комментарием. Дальше permission-гейт CLI проверяет actor'а
+    # (автора комментария), у бота collaborator-permission = none, и
+    # прогон падает с мусорным комментарием об ошибке. Команды /oc —
+    # только от людей.
     if: |-
-      contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode')
+      (contains(github.event.comment.body, '/oc') ||
+      contains(github.event.comment.body, '/opencode')) &&
+      github.event.comment.user.type != 'Bot'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
