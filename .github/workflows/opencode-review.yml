@@ -38,11 +38,19 @@ jobs:
       # Ревью-агент после комментария полез делать git-коммит в песочнице
       # раннера и падал «Author identity unknown» (PR #15, 2026-10-07):
       # задаём identity, чтобы агент мог довести свои локальные проверки
-      # до конца. persist-credentials: false — пушить всё равно нечем.
-      - name: Git identity для ревью-агента
+      # до конца.
+      #
+      # `opencode github run` после агента при «грязном» ворктрее сам
+      # коммитит и пушит в ветку PR; без credentials на push прогон
+      # падает и теряет текст ревью (PR #20, 2026-10-08). Ревью здесь
+      # read-only: уводим push в локальный bare-репозиторий — git push
+      # завершается успехом, ничего не меняя в PR.
+      - name: Git identity и no-op push для ревью-агента
         run: |
           git config user.name "opencode-review-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git init --bare /tmp/push-noop.git
+          git remote set-url --push origin /tmp/push-noop.git
 
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
