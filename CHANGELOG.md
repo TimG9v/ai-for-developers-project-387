@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.1](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.3.0...v0.3.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* **ci:** no-op push в opencode-review — ревью read-only ([2ff1f8a](https://github.com/TimG9v/ai-for-developers-project-387/commit/2ff1f8a48c5eecb38c9e2d6c96ae6ff1f6673b67))
+* **ci:** не запускать opencode-воркфлоу на событиях авторов-ботов ([fcc5b9e](https://github.com/TimG9v/ai-for-developers-project-387/commit/fcc5b9eb77017c6f6a07b1d94461052038d93bcc))
+* **ci:** не запускать opencode-воркфлоу на событиях авторов-ботов ([8869cf5](https://github.com/TimG9v/ai-for-developers-project-387/commit/8869cf589a72b9fb6cec555f8018fa06b3442d02))
+* **ci:** разрешить shallow-push в no-op bare для opencode-review ([322e012](https://github.com/TimG9v/ai-for-developers-project-387/commit/322e01273550c99afc1205f7d52177fa15dc2966))
+
 ## [0.3.0](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.2.0...v0.3.0) (2026-10-07)
 
 
