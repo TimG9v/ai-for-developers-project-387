@@ -27,5 +27,11 @@
         ]
       }
     }
+  },
+  "permission": {
+    "external_directory": {
+      "/home/runner/*": "allow",
+      "/home/runner/**": "allow"
+    }
   }
 }
