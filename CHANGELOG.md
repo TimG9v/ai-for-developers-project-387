@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.3.2...v0.4.0) (2026-10-08)
+
+
+### Features
+
+* **frontend:** форма рабочих часов в админке и подпись часового пояса для гостя ([f17c687](https://github.com/TimG9v/ai-for-developers-project-387/commit/f17c687e1b63cfc347cb5798dd03d1aa3aa9eea0))
+* рабочие окна расписания вместо ручных слотов по одному ([f8174f7](https://github.com/TimG9v/ai-for-developers-project-387/commit/f8174f72171402ccae2245daec7a71ab16e512c1)), closes [#9](https://github.com/TimG9v/ai-for-developers-project-387/issues/9)
+
+
+### Bug Fixes
+
+* **frontend:** обновить next до 16.4.0 — high-адвайзори GHSA ([3c69569](https://github.com/TimG9v/ai-for-developers-project-387/commit/3c695692d7dc7c5b7a03d898720d837f1fea4924))
+* **frontend:** обновить next до 16.4.0 — high-адвайзори GHSA ([ca68bbe](https://github.com/TimG9v/ai-for-developers-project-387/commit/ca68bbe46a9357c5d7caaf35305232e5c3c9fc53))
+* дефолт зоны формы из браузера и выравнивание окна горизонта в тесте ([2a24599](https://github.com/TimG9v/ai-for-developers-project-387/commit/2a245990d2ef9f6c53d9274309632609a01777a8)), closes [#9](https://github.com/TimG9v/ai-for-developers-project-387/issues/9)
+
 ## [0.3.2](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.3.1...v0.3.2) (2026-10-08)
 
 
