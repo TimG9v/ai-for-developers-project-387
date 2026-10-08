@@ -15,6 +15,9 @@ const routerRefresh = vi.fn();
 vi.mock("@/src/client", () => ({
   upcomingMeetingsList: (...args: unknown[]) => upcomingMeetingsList(...args),
   eventTypesList: vi.fn(async () => ({ data: [] })),
+  workingHoursApiGet: vi.fn(async () => ({
+    data: { timeZone: "UTC", rules: [] },
+  })),
   bookingsCancel: (...args: unknown[]) => bookingsCancel(...args),
 }));
 

@@ -6,6 +6,9 @@ const eventTypesList = vi.fn();
 vi.mock("@/src/client", () => ({
   eventTypesList: (...args: unknown[]) => eventTypesList(...args),
   slotsList: vi.fn(),
+  workingHoursApiGet: vi.fn(async () => ({
+    data: { timeZone: "Europe/Moscow", rules: [] },
+  })),
 }));
 
 import Page from "@/app/booking/page";

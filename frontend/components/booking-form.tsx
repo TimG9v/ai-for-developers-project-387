@@ -7,7 +7,7 @@ import { bookingsCreate, type Slot } from "@/src/client";
 // Same-origin конфиг SDK для браузера (тикет #20) — см. admin-event-types.
 import "@/src/api-config";
 
-import { formatSlotInterval } from "@/lib/slot-time";
+import { formatSlotInterval, formatSlotIntervalInZone } from "@/lib/slot-time";
 
 type BookingFormError = "empty-fields";
 
@@ -23,10 +23,13 @@ const ERROR_MESSAGES: Record<BookingFormError, string> = {
  */
 export function BookingForm({
   slot,
+  timeZone,
   onBooked,
   onRejected,
 }: {
   slot: Slot;
+  /** Часовой пояс подписи интервала; без него — зона устройства. */
+  timeZone?: string;
   /** Успех: родитель показывает подтверждение со ссылкой управления записью. */
   onBooked: (bookingId: string, guestEmail: string) => void;
   /** Отказ сервера: родитель показывает сообщение и обновляет календарь. */
@@ -36,10 +39,16 @@ export function BookingForm({
   const [guestEmail, setGuestEmail] = useState("");
   const [error, setError] = useState<BookingFormError | null>(null);
 
-  const interval = formatSlotInterval(
-    new Date(slot.startDateTime),
-    new Date(slot.endDateTime),
-  );
+  const interval = timeZone
+    ? formatSlotIntervalInZone(
+        new Date(slot.startDateTime),
+        new Date(slot.endDateTime),
+        timeZone,
+      )
+    : formatSlotInterval(
+        new Date(slot.startDateTime),
+        new Date(slot.endDateTime),
+      );
 
   async function handleSubmit(formEvent: FormEvent<HTMLFormElement>) {
     formEvent.preventDefault();

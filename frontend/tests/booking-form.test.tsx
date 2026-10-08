@@ -7,10 +7,13 @@ const bookingsCreate = vi.fn();
 vi.mock("@/src/client", () => ({
   slotsList: (...args: unknown[]) => slotsList(...args),
   bookingsCreate: (...args: unknown[]) => bookingsCreate(...args),
+  workingHoursApiGet: vi.fn(async () => ({
+    data: { timeZone: "UTC", rules: [] },
+  })),
 }));
 
 import { BookingEventTypes } from "@/components/booking-event-types";
-import { formatSlotInterval } from "@/lib/slot-time";
+import { formatSlotIntervalInZone, viewerTimeZone } from "@/lib/slot-time";
 
 const EVENT_TYPES = [{ id: "et1", title: "Созвон", durationMinutes: 30 }];
 
@@ -31,7 +34,7 @@ async function renderWithFreeSlot() {
   render(<BookingEventTypes initialEventTypes={EVENT_TYPES} />);
   fireEvent.click(screen.getByRole("button", { name: "Выбрать Созвон" }));
   const slotButton = await screen.findByRole("button", {
-    name: `Записаться на ${formatSlotInterval(slotStart, slotEnd)}`,
+    name: `Записаться на ${formatSlotIntervalInZone(slotStart, slotEnd, viewerTimeZone())}`,
   });
   fireEvent.click(slotButton);
   await screen.findByLabelText("Имя");
@@ -94,7 +97,7 @@ describe("booking form", () => {
     // Занятый слот больше не выбирается в календаре.
     await waitFor(() => {
       expect(
-        screen.queryByRole("button", { name: `Записаться на ${formatSlotInterval(slotStart, slotEnd)}` }),
+        screen.queryByRole("button", { name: `Записаться на ${formatSlotIntervalInZone(slotStart, slotEnd, viewerTimeZone())}` }),
       ).toBeNull();
     });
     await waitFor(() => {
@@ -133,7 +136,7 @@ describe("booking form", () => {
     });
     expect(
       screen.queryByRole("button", {
-        name: `Записаться на ${formatSlotInterval(slotStart, slotEnd)}`,
+        name: `Записаться на ${formatSlotIntervalInZone(slotStart, slotEnd, viewerTimeZone())}`,
       }),
     ).toBeNull();
   });

@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/src/client", () => ({
   eventTypesList: vi.fn(async () => ({ data: [] })),
   slotsList: vi.fn(),
+  workingHoursApiGet: vi.fn(async () => ({
+    data: { timeZone: "Europe/Moscow", rules: [] },
+  })),
 }));
 
 import Page from "@/app/booking/page";
