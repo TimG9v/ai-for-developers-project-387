@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.4.0...v0.4.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **backend:** тест working-hours не зависит от дня недели ([56ff7bd](https://github.com/TimG9v/ai-for-developers-project-387/commit/56ff7bd5168a401730c3d1870dc25989ba41767c))
+* **backend:** тест working-hours не зависит от дня недели ([466550c](https://github.com/TimG9v/ai-for-developers-project-387/commit/466550c6f72b1f26f8287557e15a386f753bf385))
+
 ## [0.4.0](https://github.com/TimG9v/ai-for-developers-project-387/compare/v0.3.2...v0.4.0) (2026-10-08)
 
 
