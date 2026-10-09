@@ -6,6 +6,12 @@ on:
 
 jobs:
   triage:
+    # Issue от бота (opencode-agent[bot] после Lighthouse-прогона)
+    # стартовала триаж, который падал на внутреннем perm-гейте экшена:
+    # у bot-автора нет collaborator-прав, агент не стартует, бот
+    # получает мусорный комментарий с ошибкой (issue #26, прогон
+    # 37757599684). Ботов отсекаем до старта job — нулевой расход.
+    if: github.event.issue.user.type != 'Bot'
     runs-on: ubuntu-latest
     permissions:
       id-token: write

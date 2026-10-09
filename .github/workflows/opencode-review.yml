@@ -27,7 +27,9 @@ jobs:
       id-token: write
       contents: read
       pull-requests: write
-      issues: write
+      # Ревью пишет только комментарий к PR; issues читает (связанная
+      # задача), но не изменяет — write понижен до read (task-12).
+      issues: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
