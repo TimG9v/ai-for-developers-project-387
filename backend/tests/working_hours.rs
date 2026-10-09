@@ -122,13 +122,30 @@ async fn working_hours_put_materializes_slots_and_get_roundtrips() {
     );
 
     // Структура дня: слоты встык от 10:00 до 17:00, начало на сетке.
-    let tomorrow = (Utc::now() + Duration::days(1)).date_naive();
-    let tomorrow_ten = tomorrow.and_hms_opt(10, 0, 0).unwrap();
+    // День проверки — первый рабочий день горизонта, а не календарное
+    // «завтра»: при weekdays 1–5 завтра может оказаться выходным (сб/вс),
+    // слотов на него нет, и ассерт падал каждую пятницу и субботу UTC.
+    let now = Utc::now();
+    let probe = (1..=14)
+        .map(|offset| now.date_naive() + Duration::days(offset))
+        .find(|day| {
+            weekdays.contains(&(day.weekday().number_from_monday() as i32))
+                && day
+                    .and_hms_opt(10, 0, 0)
+                    .and_then(|naive| Utc.from_local_datetime(&naive).single())
+                    .is_some_and(|start| {
+                        start >= now && start <= now + Duration::days(BOOKING_WINDOW_DAYS)
+                    })
+        })
+        .expect("в горизонте 14 дней всегда есть рабочий день");
+    let ten = probe
+        .and_hms_opt(10, 0, 0)
+        .and_then(|naive| Utc.from_local_datetime(&naive).single())
+        .expect("у рабочего дня горизонта есть 10:00 UTC");
     let starts = sorted_starts(&slots, "et1");
-    let ten = Utc.from_local_datetime(&tomorrow_ten).single().unwrap();
     assert!(
         starts.contains(&ten),
-        "завтра 10:00 UTC должно существовать"
+        "первый рабочий день горизонта должен иметь слот 10:00 UTC"
     );
     let day_slots: Vec<_> = starts
         .iter()
