@@ -152,13 +152,13 @@ Frontend CI (eslint, vitest, build), Security (cargo/npm audit), hexlet-check
 | ------------------ | -------------------------------- | ----------------------------- | -------------------------------------- | -------------------------------------------- |
 | Backend CI         | push и PR                        | —                             | fmt, clippy, тесты backend             | Actions → Backend CI                         |
 | Frontend CI        | push и PR                        | —                             | eslint, vitest, build                  | Actions → Frontend CI                        |
-| Security           | push и PR                        | —                             | cargo/npm audit по lock-файлам         | Actions → Security                           |
+| Security           | push, PR и ежедневный cron       | —                             | cargo/npm audit по lock-файлам         | Actions → Security                           |
 | hexlet-check       | push                             | —                             | Docker-сборка, автотесты Хекслета      | Actions → hexlet-check                       |
 | Release Please     | push в `main`                    | —                             | release-PR: changelog и semver         | Actions → Release Please                     |
 | opencode           | комментарий `/oc` в issue или PR | zai-coding-plan/glm-5.3-flash | разбор задачи, фиксы и фичи по команде | Actions, ответ — комментарий в треде         |
 | opencode-triage    | открыта issue (не ботом)         | zai-coding-plan/glm-5.3-flash | автотриаж: причина, путь исправления   | Actions, ответ — комментарий к issue         |
 | opencode-review    | PR открыт/обновлён (не бот)      | zai-coding-plan/glm-5.3-flash | авторевью PR по правилам AGENTS.md     | Actions, ответ — комментарий к PR            |
-| opencode-scheduled | cron 06:00 UTC + вручную         | zai-coding-plan/glm-5.3-flash | Lighthouse деплоя, issue по находкам   | Actions, артефакт `lighthouse-report`, issue |
+| opencode-scheduled | cron 06:00 МСК + вручную         | zai-coding-plan/glm-5.3-flash | Lighthouse деплоя, issue по находкам   | Actions, артефакт `lighthouse-report`, issue |
 
 ### Принятые решения
 
