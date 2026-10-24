@@ -1,9 +1,12 @@
 name: opencode-scheduled
 
 on:
-  schedule:
-    - cron: "0 6 * * *" # ежедневно 06:00 по Москве
-      timezone: Europe/Moscow
+  # Ночные запуски отключены: сработать сам workflow больше не может —
+  # только вручную через workflow_dispatch. Возврат расписания —
+  # раскомментировать блок schedule.
+  # schedule:
+  #   - cron: "0 6 * * *" # ежедневно 06:00 по Москве
+  #     timezone: Europe/Moscow
   workflow_dispatch:
 
 jobs:

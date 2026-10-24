@@ -7,3 +7,6 @@ dist/
 *.tsbuildinfo
 .env*.local
 tmp*
+
+# Lighthouse-отчёт из opencode-scheduled (CI) — не для коммита
+lighthouse/
